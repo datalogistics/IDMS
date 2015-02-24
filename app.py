@@ -19,28 +19,31 @@ from ws4py.client.tornadoclient import TornadoSoketClient
 import settings
 import policy.refreshpolicy as policy
 import protocol.ibpprotocol as protocol
+import web.unisproxy as db
 
 from web.handlers import ExnodeSocketClient, ExtentSocketClient
 
 class DispatcherApplication(object):
     def __init__(self):
         logging.info("__init__: Creating new Dispatcher")
-        self._pending = []
-        self._policy = policy.RefreshPolicy()
+        self._pending  = []
+        self._policy   = policy.RefreshPolicy()
         self._protocol = protocol.IBPProtocol()
+        self._db       = db.UnisBridge(settings.UNIS_HOST, settings.UNIS_PORT, **settings)
 
     # Register all currently availible exnodes on UNIS to the policy
-        exnodes = self._get_exnodes()
+        exnodes = self._db.GetExnodes()
         for exnode in exnodes:
             tmpResult = self._policy.RegisterExnode(exnode)
             logging.info("app.__init__: Registered exnode [{id}]".format(id=tmpResult["id"]))
 
     # Register all currently availible extents on UNIS to the policy
     # and register their id in the action priority queue
-        extents = self._get_extents()
+        extents = self._db.GetExtents()
         for extent in extents:
             tmpResult = self._policy.RegisterExtent(extent)
-            logging.info("app.__init__: Registered extent [{id}]".format(id=tmpResult["id"]))
+            if tmpResult:
+                logging.info("app.__init__: Registered extent [{id}]".format(id=tmpResult["id"]))
         
         # Create websockets to listen for future changes to exnodes and extents
         tmpExnodeUrl = "{protocol}://{host}:{port}/subscribe/{resource}".format(protocol = "ws",
@@ -78,49 +81,42 @@ class DispatcherApplication(object):
 
 
     def _process_instruction(self, instruction):
-    #TODO:  Protocol communication with the IBP depots to execute the actual
-    #       changes to the depot.  If the instruction's destination and source
-    #       are the same, just do a manage call and change the duration,
-    #       else make a copy call to the new depot location.
-        pass
-
-
-
-    def _get_exnodes(self):
-    # Attempt to get a list of file exnodes from UNIS
         try:
-            url = "http://{host}:{port}/{collection}?{options}".format(host       = settings.UNIS_HOST,
-                                                                       port       = settings.UNIS_PORT,
-                                                                       collection = "exnodes",
-                                                                       options    = "mode=file")
-            request = urllib2.Request(url)
-            request.add_header("Accept": "application/perfsonar+json")
-            
-            response = urllib2.urlopen(request, timeout=5).read()
-        except urllib2.URLError as exp:
-            logging.error("get_exnodes: %s" % exp)
-            return False
-        
-        return json.loads(response)
+            extent = instruction["extent"]
+            source = extent["mapping"]["read"].split["/"]
+            source = dict(zip(["host", "port"], address[1].split[":"]))
 
+            for destination in instructions["addresses"]:
+                # Instruction is a refresh in place
+                if source == destination:
+                    duration = self._protocol.Manage(source, extent)
+                    if duration:
+                        newExtent = extent
+                        newExtent["lifetimes"][0]["start"] = datetime.datetime.now().strptime("%Y-%m-%d %H:%M:%S")
+                        newExtent["lifetimes"][0]["end"]   = datetime.datetime.now() + duration
+                        self._db.UpdateExtent(newExtent)
+                    else:
+                        logging.warn("app._process_instructions:  Failed to change duration on depot")
 
-        def _get_extents(self):
-        # Attempt to get a list of file extents from UNIS
-            try:
-                url = "http://{host}:{port}/{collection}?{options}".format(host       = settings.UNIS_HOST,
-                                                                           port       = settings.UNIS_PORT,
-                                                                           collection = "extents",
-                                                                           options    = "")
-                request = urllib2.Request(url)
-                request.add_header("Accept": "application/perfsonar+json")
-                
-                response = urllib2.urlopen(request, timeout=5).read()
-            except urllib2.URLError as exp:
-                logging.error("get_extents: %s" % exp)
-                return False
-    
-            return json.loads(response)
-    
+                # Instruction is a copy
+                else:
+                    response = self._protocol.Copy(source      = source,
+                                               destination = destination,
+                                               extent      = extent)
+                    if response:
+                        newExtent = { "location": "ibp://", 
+                                      "size":    extent["size"], 
+                                      "offset":  extent["offset"], 
+                                      "parent":  extent["parent"],
+                                      "mapping": response["caps"] }
+
+                        newExtent["lifetimes"][0]["start"] = datetime.datetime.now().strptime("%Y-%m-%d %H:%M:%S")
+                        newExtent["lifetimes"][0]["end"]   = datetime.datetime.now() + response["duration"]
+                        self._db.UpdateExtent(newExtent)
+                        
+                        
+        except Exception as exp:
+            logging.warn("app._process_instructions: Could not proccess instruction - {message}".format(message = exp))
 
 
 def main():

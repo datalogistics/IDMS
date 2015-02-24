@@ -12,12 +12,12 @@ that functionality to other modules.
 
 '''
 
-import settings
+import protocol.settings as settings
 import protocol
 
 class IBPProtocol(Protocol):
 
-    def GetStatus(self, address, kwargs = {}):
+    def GetStatus(self, address, **kwargs):
     # Query the status of a Depot.
     
     # Generate request with the following form
@@ -39,14 +39,14 @@ class IBPProtocol(Protocol):
 
         return dict(zip(["total", "used", "volatile", "used-volatile", "max-duration"], result))
         
-    def Copy(self, source, destination, chunk, kwargs = {}):
-        return self.Move(source, destination, chunk, kwargs)
+    def Copy(self, source, destination, extent, **kwargs):
+        return self.Move(source, destination, extent, **kwargs)
     
-    def Move(self, source, destination, chunk, kwargs = {}):
-    # Move a chunk from one {source} Depot to one {destination} depot
+    def Move(self, source, destination, extent, **kwargs):
+    # Move an extent from one {source} Depot to one {destination} depot
 
     # Generate caps from data
-        src_caps = self._get_caps(chunk["mapping"])
+        src_caps = self._get_caps(extent["mapping"])
         
     # Generate destination Allocation and Capabilities using the form below
     # PROTOCOL_VERSION[0] IBP_ALLOCATE[1] reliability cap_type duration size timeout
@@ -65,39 +65,38 @@ class IBPProtocol(Protocol):
             timeout = kwargs["timeout"]
 
         try:
-            tmpCommand = "{0} {1} {2} {3} {4} {5} {6} \n".format(settings.PROTOCOL_VERSION, settings.IBP_ALLOCATE, reliability, cap_type, duration, chunk["size"], timeout)
+            tmpCommand = "{0} {1} {2} {3} {4} {5} {6} \n".format(settings.PROTOCOL_VERSION, settings.IBP_ALLOCATE, reliability, cap_type, duration, extent["size"], timeout)
             result = self._dispatch_command(destination["host"], destination["port"], tmpCommand)
             result = result.splitlines()
         except:
             return None
-        
-        dest_caps = self._get_caps(dict(zip(["read", "write", "manage"], result)))
+
+        string_caps = dict(zip(["read", "write", "manage"], result))
+        dest_caps = self._get_caps(string_caps)
         
     # Generate move request with the following form
     # PROTOCOL_VERSION[0] IBP_SEND[5] src_read_key dest_write_key src_WRMKey offset size timeout timeout timeout
         try:
-            tmpCommand = "{0} {1} {2} {3} {4} {5} {6} {7} {8} {9} \n".format( \
-                                                                           settings.PROTOCOL_VERSION, \
-                                                                           settings.IBP_SEND, \
-                                                                           src_caps["read"]["key"], \
-                                                                           dest_caps["write"]["key"], \
-                                                                           src_caps["read"]["wrm_key"], \
-                                                                           0, \
-                                                                           timeout, \
-                                                                           timeout, \
-                                                                           timeout, \
+            tmpCommand = "{0} {1} {2} {3} {4} {5} {6} {7} {7} {7} \n".format( settings.PROTOCOL_VERSION,
+                                                                              settings.IBP_SEND,
+                                                                              src_caps["read"]["key"],
+                                                                              dest_caps["write"]["key"],
+                                                                              src_caps["read"]["wrm_key"],
+                                                                              0,
+                                                                              timeout
                                                                        )
             result = self._dispatch_command(source["host"], source["port"], tmpCommand)
         except:
             return None
         
         if result.startswith("-"):
-            return int(result)
+            logging.warn("IBPProtocol.Move: Could not move extent - {1}".format(result))
+            return None
         else:
             result = result.split(" ")
-            return result[1]
+            return {"caps": string_caps, "duration": duration }
     
-    def Manage(self, address, chunk, kwargs = {}):
+    def Manage(self, address, extent, **kwargs):
         cap_type    = 0
         reliability = settings.IBP_HARD
         timeout     = settings.DEFAULT_TIMEOUT
@@ -118,23 +117,23 @@ class IBPProtocol(Protocol):
             duration = kwargs["duration"]
             
         try:
-            caps = _get_caps(chunk["mapping"])
-            tmpCommand = "{0} {1} {2} {3} {4} {5} {6} {7} {8} {9}\n".format(settings.PROTOCOL_VERSION, \
-                                                                            settings.IBP_MANAGE, \
-                                                                            caps["manage"]["key"], \
-                                                                            caps["manage"]["type"], \
-                                                                            settings.IBP_CHANGE, \
-                                                                            cap_type, \
-                                                                            max_size, \
-                                                                            duration, \
-                                                                            reliability, \
+            caps = _get_caps(extent["mapping"])
+            tmpCommand = "{0} {1} {2} {3} {4} {5} {6} {7} {8} {9}\n".format(settings.PROTOCOL_VERSION,
+                                                                            settings.IBP_MANAGE,
+                                                                            caps["manage"]["key"],
+                                                                            caps["manage"]["type"],
+                                                                            settings.IBP_CHANGE,
+                                                                            cap_type,
+                                                                            max_size,
+                                                                            duration,
+                                                                            reliability,
                                                                             timeout
                                                                             )
             result = self._dispatch_command(address["host"], address["port"], tmpCommand)
         except:
             return None
 
-        return True
+        return duration
         
     def _dispatch_command(self, host, port, command):
     # Create socket and configure with host and port
@@ -152,10 +151,10 @@ class IBPProtocol(Protocol):
         
         return response
         
-    def _get_caps(self, chunk):
+    def _get_caps(self, extent):
         result = {}
 
-        for item, key in chunk:
+        for item, key in extent:
             tmpSplit = item.split("/")
             result[key] = { "key": tmpSplit[2], "wrm_key": tmpSplit[3], "type": tmpSplit[4] }
         

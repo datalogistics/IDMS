@@ -17,9 +17,8 @@ tolerence of their expiration.
 '''
 import uuid
 import datetime
-import heapq
 
-import defaultSettings as settings
+import policy.defaultSettings as settings
 
 class Policy(object):
     # Initializes the policy, this function can be extended to do preprocessing
@@ -55,6 +54,10 @@ class Policy(object):
     def RegisterExtent(self, extent):
         expires = datetime.datetime.strptime(extent["lifetimes"][0]["end"], "%Y-%m-%d %H:%M:%S")
         priority = (expires - datetime.datetime(1970,1 1)).total_seconds()
+
+        if expires < datetime.datetime.now():
+            logging.info("Policy.RegisterExtent: Extent is old, did not register")
+            return None
         
         newExtent = {}
         newExtent["data"]  = extent
@@ -89,7 +92,7 @@ class Policy(object):
         address = address.split["/"]
         address = dict(zip(["host", "port"], address[1].split[":"]))
         return { "extent": extent, "addresses": [address] }
-            
+        
 
 
     # GetPendingExtents

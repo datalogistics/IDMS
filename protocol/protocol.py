@@ -17,17 +17,17 @@ class Protocol(object):
     def __init__(self):
         pass
 
-    def GetStatus(self, address, kargs):
+    def GetStatus(self, address, **kargs):
         pass
 
-    def Copy(self, src, dest, chunk, kwargs):
+    def Copy(self, source, destination, extent, **kwargs):
         pass
 
-    def Move(self, src, dest, chunk, kwargs):
+    def Move(self, source, destination, extent, **kwargs):
         pass
 
-    def Release(self, address, kwargs):
+    def Release(self, address, **kwargs):
         pass
 
-    def Manage(self, address, chunk, kwargs):
+    def Manage(self, address, extent, **kwargs):
         pass
