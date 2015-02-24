@@ -28,19 +28,19 @@ class DispatcherApplication(object):
         self._pending = []
         self._policy = policy.RefreshPolicy()
         self._protocol = protocol.IBPProtocol()
+
     # Register all currently availible exnodes on UNIS to the policy
         exnodes = self._get_exnodes()
         for exnode in exnodes:
-            tmpResult = policy.RegisterExnode(exnode)
-            logging.info("__init__: Registered exnode [{id}]".format(id=tmpResult["id"]))
+            tmpResult = self._policy.RegisterExnode(exnode)
+            logging.info("app.__init__: Registered exnode [{id}]".format(id=tmpResult["id"]))
 
     # Register all currently availible extents on UNIS to the policy
     # and register their id in the action priority queue
         extents = self._get_extents()
         for extent in extents:
-            tmpResult = policy.RegisterExtent(extent)
-            heapq.heappush(self._pending, (tmpResult["priority"], tmpResult["id"]))
-            logging.info("__init__: Registered extent [{id}]".format(id=tmpResult["id"]))
+            tmpResult = self._policy.RegisterExtent(extent)
+            logging.info("app.__init__: Registered extent [{id}]".format(id=tmpResult["id"]))
         
         # Create websockets to listen for future changes to exnodes and extents
         tmpExnodeUrl = "{protocol}://{host}:{port}/subscribe/{resource}".format(protocol = "ws",
@@ -54,11 +54,13 @@ class DispatcherApplication(object):
         
         exnode_ws = ExnodeSocketClient(tmpExnodeUrl)
         extent_ws = ExtentSocketClient(tmpExtentUrl)
+        exnode_ws.initialize(policy = self._policy)
+        extent_ws.initialize(policy = self._policy)
         exnode_ws.connect()
         extent_ws.connect()
 
     def Run(self):
-        logging.info("Run: Starting main loop")
+        logging.info("app.Run: Starting main loop")
         tornado.ioloop.PeriodicCallback(callback=self._check_extents, callback_timeout=settings.ITERATION_TIME * 1000).start()
         tornado.ioloop.IOLoop.instance().start()
 
@@ -66,14 +68,15 @@ class DispatcherApplication(object):
     def _check_extents(self):
     # Check for pending changes from the policy
         if self._policy.hasPending():
-            for extent in self._policy.GetPendingExtents():
+            tmpPending = self._policy.GetPendingExtents()
+
+            for extent in tmpPending:
                 instruction = self._policy.ProcessExtent(extent)
                 if instruction:
                     self._process_instruction(instruction)
 
-    #TODO:  HEAPPOP the highest priority extent and process it
-    #       if there is nothing to do, return.
-        
+
+
     def _process_instruction(self, instruction):
     #TODO:  Protocol communication with the IBP depots to execute the actual
     #       changes to the depot.  If the instruction's destination and source

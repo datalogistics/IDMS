@@ -17,6 +17,8 @@ tolerence of their expiration.
 '''
 import uuid
 import datetime
+import heapq
+
 import defaultSettings as settings
 
 class Policy(object):
@@ -25,7 +27,7 @@ class Policy(object):
     def __init__(self, kwargs):
         self._extents = {}
         self._exnodes = {}
-
+        self._event_queue = []
 
 
     # RegisterExnode
@@ -38,7 +40,7 @@ class Policy(object):
         # Register extents for the new exnode
         newExnode = {}
         newExnode["data"] = exnode
-            
+        
         self._exnodes[exnode["id"]] = newExnode
         return { "timestamp": exnode["ts"], "id": exnode["id"] }
 
@@ -52,14 +54,23 @@ class Policy(object):
     #      This function adds an extent to the currently known extents to upkeep.
     def RegisterExtent(self, extent):
         expires = datetime.datetime.strptime(extent["lifetimes"][0]["end"], "%Y-%m-%d %H:%M:%S")
-        expires = (expires - datetime.datetime(1970,1 1)).total_seconds()
-
+        priority = (expires - datetime.datetime(1970,1 1)).total_seconds()
+        
         newExtent = {}
         newExtent["data"]  = extent
         newExtent["expires"] = expires
         
         self._extents[extent["id"]] = newExtent
-        return { "priority": expires, "id": extent["id"] }
+        
+        # If the extent already has an event associated with it, remove the old event
+        for event in self._event_queue:
+            if event["id"] == extent["id"]:
+                self._event_queue.remove(event)
+                break
+                
+        # Create an event associated with the new extent
+        self._event_queue.append({ "priority": priority, "expires": expires, "id": extent["id"] })
+        return { "priority": priority, "id": extent["id"] }
 
 
 
@@ -74,13 +85,10 @@ class Policy(object):
         extent = self._extents[extent_id]["data"]
         expires = self._extents[extent_id]["expires"]
         
-        if datetime.datetime.now() - exipres > datetime.timedelta(**settings.refresh_tolerance):
-            return False
-        else:
-            address = extent["mapping"]["write"]
-            address = address.split["/"]
-            address = dict(zip(["host", "port"], address[1].split[":"]))
-            return { "extent": extent, "addresses": [address] }
+        address = extent["mapping"]["write"]
+        address = address.split["/"]
+        address = dict(zip(["host", "port"], address[1].split[":"]))
+        return { "extent": extent, "addresses": [address] }
             
 
 
@@ -92,7 +100,16 @@ class Policy(object):
     #      changes may be due to their lifetimes expiring or new topology 
     #      information causing an extent to invalidate.
     def GetPendingExtents(self):
-        return []
+        tmpPending = []
+        tmpLastPendingIndex = 0
+        tmpTolerance = datetime.timedelta(**settings.refresh_tolerance)
+        
+        self._event_queue = sorted(self._event_queue, key = lambda event: event["expires"])
+        
+        while datetime.datetime.now() - self._event_queue[tmpLastPendingIndex]["expires"] < tmpTolerance:
+            tmpPending.append(self._event_queue[tmpLastPendingIndex++]["id"])
+
+        return tmpPending
 
 
 
@@ -102,5 +119,8 @@ class Policy(object):
     # @description:
     #      Returns if there are currently pending extents ready for update.
     def hasPending(self):
-        return False
+        # Check if the first event is within the current tolerance
+        self._event_queue = sorted(self._event_queue, key = lambda event: event["expires"])
+        tmpExpires = datetime.datetime.fromtimestamp(self._event_queue[0]["expires"])
 
+        return datetime.datetime.now() - tmpExpires < datetime.timedelta(**settings.refresh_tolerance)

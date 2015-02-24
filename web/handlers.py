@@ -1,8 +1,16 @@
 
 
 import ws4py.client.tornadoclient import TornadoWebSocketClient
+import policy.policy as policy
 
-class ExnodeSocketClient(TornadoWebSocketClient):
+class UNISSocketClient(TornadoWebSocketClient):
+    def initialize(self, policies):
+        self._policy = policies
+
+
+
+
+class ExnodeSocketClient(UNISSocketClient):
     def opened(self):
         pass
 
@@ -10,7 +18,7 @@ class ExnodeSocketClient(TornadoWebSocketClient):
         pass
 
 
-class ExtentSocketClient(TornadoWebSocketClient):
+class ExtentSocketClient(UNISSocketClient):
     def opened(self):
         pass
 

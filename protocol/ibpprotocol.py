@@ -32,15 +32,15 @@ class IBPProtocol(Protocol):
         
         try:
             tmpCommand = "{0} {1} {2} {3}\n".format(settings.PROTOCOL_VERSION, settings.IBP_ST_INQ, pwd, timeout)
-            result = self._dispatch_command(addres["host"], address["port"], tmpCommand)
+            result = self._dispatch_command(address["host"], address["port"], tmpCommand)
             result = result.split(" ")
         except:
             return None
 
-        result = dict(zip(["total", "used", "volatile", "used-volatile", "max-duration"], result))
+        return dict(zip(["total", "used", "volatile", "used-volatile", "max-duration"], result))
         
     def Copy(self, source, destination, chunk, kwargs = {}):
-        self.Move(source, destination, chunk, kwargs)
+        return self.Move(source, destination, chunk, kwargs)
     
     def Move(self, source, destination, chunk, kwargs = {}):
     # Move a chunk from one {source} Depot to one {destination} depot
