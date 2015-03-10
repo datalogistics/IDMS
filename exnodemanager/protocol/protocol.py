@@ -26,7 +26,7 @@ class Protocol(object):
     def Move(self, source, destination, extent, **kwargs):
         pass
 
-    def Release(self, address, **kwargs):
+    def Release(self, address, extent, **kwargs):
         pass
 
     def Manage(self, address, extent, **kwargs):

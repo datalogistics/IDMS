@@ -14,9 +14,10 @@ import urllib2
 import json
 import tornado
 
-from ws4py.client.tornadoclient import TornadoSoketClient
+from ws4py.client.tornadoclient import TornadoWebSocketClient
 
 import settings
+import web.settings as unis_settings
 import policy.refreshpolicy as policy
 import protocol.ibpprotocol as protocol
 import web.unisproxy as db
@@ -29,13 +30,13 @@ class DispatcherApplication(object):
         self._pending  = []
         self._policy   = policy.RefreshPolicy()
         self._protocol = protocol.IBPProtocol()
-        self._db       = db.UnisBridge(settings.UNIS_HOST, settings.UNIS_PORT, **settings)
+        self._db       = db.UnisProxy(unis_settings.UNIS_HOST, unis_settings.UNIS_PORT)
 
     # Register all currently availible exnodes on UNIS to the policy
         exnodes = self._db.GetExnodes()
         for exnode in exnodes:
             tmpResult = self._policy.RegisterExnode(exnode)
-            logging.info("app.__init__: Registered exnode [{id}]".format(id=tmpResult["id"]))
+            logging.info("app.__init__: Registered exnode [{id}]".format(id=tmpResult))
 
     # Register all currently availible extents on UNIS to the policy
     # and register their id in the action priority queue
@@ -47,12 +48,12 @@ class DispatcherApplication(object):
         
         # Create websockets to listen for future changes to exnodes and extents
         tmpExnodeUrl = "{protocol}://{host}:{port}/subscribe/{resource}".format(protocol = "ws",
-                                                                          host     = settings.UNIS_HOST,
-                                                                          port     = settings.UNIS_PORT,
+                                                                          host     = unis_settings.UNIS_HOST,
+                                                                          port     = unis_settings.UNIS_PORT,
                                                                           resource = "exnodes")
         tmpExtentUrl = "{protocol}://{host}:{port}/subscribe/{resource}".format(protocol = "ws",
-                                                                          host     = settings.UNIS_HOST,
-                                                                          port     = settings.UNIS_PORT,
+                                                                          host     = unis_settings.UNIS_HOST,
+                                                                          port     = unis_settings.UNIS_PORT,
                                                                           resource = "extent")
         
         exnode_ws = ExnodeSocketClient(tmpExnodeUrl)
@@ -64,7 +65,7 @@ class DispatcherApplication(object):
 
     def Run(self):
         logging.info("app.Run: Starting main loop")
-        tornado.ioloop.PeriodicCallback(callback=self._check_extents, callback_timeout=settings.ITERATION_TIME * 1000).start()
+        tornado.ioloop.PeriodicCallback(callback=self._check_extents, callback_time=settings.ITERATION_TIME * 1000).start()
         tornado.ioloop.IOLoop.instance().start()
 
 
@@ -83,8 +84,8 @@ class DispatcherApplication(object):
     def _process_instruction(self, instruction):
         try:
             extent = instruction["extent"]
-            source = extent["mapping"]["read"].split["/"]
-            source = dict(zip(["host", "port"], address[1].split[":"]))
+            source = extent["mapping"]["read"].split("/")
+            source = dict(zip(["host", "port"], address[2].split(":")))
 
             for destination in instructions["addresses"]:
                 # Instruction is a refresh in place
@@ -119,42 +120,58 @@ class DispatcherApplication(object):
             logging.warn("app._process_instructions: Could not proccess instruction - {message}".format(message = exp))
 
 
+class PurgeApplication(DispatcherApplication):
+    def Run(self):
+        extents = self._policy.extentList()
+
+        for extent in extents:
+            address = extent["mapping"]["read"].slipt("/")
+            address = dict(zip(["host", "port"], address[2].split(":")))
+            logging.info("app.Run: Purging   {0}   from   {1}".format(extent["id"], address))
+
+            self._protocol.Release(address, extent)
+            
+            newExtent = extent
+            newExtent["lifetimes"][0]["end"]   = datetime.datetime.now()
+            self._db.UpdateExtent(newExtent)
+
+
+
 def main():
 # Parse arguments
     description = """{prog} collects and manages file information stored in UNIS.
                      Depending on the policy, {prog} will refresh, move, or duplicate
                      data based on network conditions.""".format(prog = sys.argv[0])
     parser = argparse.ArgumentParser(description=description)
-    parser.add_argument('-d', '--debug', type=bool, default=false)
+    parser.add_argument('-d', '--debug', action='store_true')
     parser.add_argument('-l', '--log-file', type=str)
-    parser.add_argument('-h', '--unis-host')
+    parser.add_argument('-u', '--unis-host')
     parser.add_argument('-p', '--unis-port', type=int)
+    parser.add_argument('--purge', action='store_true')
     args = parser.parse_args()
+    do_purge = False
 
     if args.debug:
         settings.LOG_LEVEL = logging.DEBUG
     if args.log_file:
         settings.LOG_PATH = args.log_file
     if args.unis_host:
-        settings.UNIS_HOST = args.unis_host
+        unis_settings.UNIS_HOST = args.unis_host
     if args.unis_port:
-        settings.UNIS_PORT = args.unis_port
+        unis_settings.UNIS_PORT = args.unis_port
+    if args.purge:
+        do_purge = True
 
 # Create and initialize logger
-    logger = logging.getLogger("Disptacher")
-    logger.setLevel(settings.LOG_LEVEL)
-    
     if settings.LOG_PATH:
-        log_out = logging.FileHandler(settings.LOG_PATH)
+        logging.basicConfig(filename=settings.LOG_PATH, level=settings.LOG_LEVEL)
     else:
-        log_out = logging.StreamHandler()
+        logging.basicConfig(level=settings.LOG_LEVEL)
     
-    log_out.setLevel(settings.LOG_LEVEL)
-    formatter = logging.Formatter("[%(asctime)s] %(Levelname)s: %(name)s - %(message)s")
-    log_out.setFormatter(formatter)
-    logger.addHandler(log_out)
-    
-    app = DispatcherApplication()
+    if do_purge:
+        app = PurgeApplication()
+    else:
+        app = DispatcherApplication()
     app.Run()
 
 
