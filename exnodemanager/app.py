@@ -88,9 +88,14 @@ class DispatcherApplication(object):
             source = dict(zip(["host", "port"], address[2].split(":")))
 
             for destination in instructions["addresses"]:
+                if "duration" in destination:
+                    duration = destination["duration"]
+                else:
+                    duration = None
+
                 # Instruction is a refresh in place
-                if source == destination:
-                    duration = self._protocol.Manage(source, extent)
+                if source == destination["address"]:
+                    duration = self._protocol.Manage(source, extent, duration=duration)
                     if duration:
                         newExtent = extent
                         newExtent["lifetimes"][0]["start"] = datetime.datetime.now().strptime("%Y-%m-%d %H:%M:%S")
@@ -102,8 +107,9 @@ class DispatcherApplication(object):
                 # Instruction is a copy
                 else:
                     response = self._protocol.Copy(source      = source,
-                                               destination = destination,
-                                               extent      = extent)
+                                                   destination = destination["address"],
+                                                   extent      = extent,
+                                                   duration    = duration)
                     if response:
                         newExtent = { "location": "ibp://", 
                                       "size":    extent["size"], 

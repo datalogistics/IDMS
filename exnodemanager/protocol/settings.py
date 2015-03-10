@@ -29,4 +29,4 @@ IBP_FIFO      = 3
 IBP_CIRQ      = 4
 
 
-DEFAULT_DURATION = 60 * 60 * 10 # Ten hours
+DEFAULT_DURATION = 60 * 60 * 24 # 32 hours

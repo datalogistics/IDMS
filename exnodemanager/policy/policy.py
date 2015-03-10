@@ -107,7 +107,7 @@ class Policy(object):
         address = extent["mapping"]["write"]
         address = address.split("/")
         address = dict(zip(["host", "port"], address[2].split(":")))
-        return { "extent": extent, "addresses": [address] }
+        return { "extent": extent, "addresses": [{"address":address, "duration": settings.DEFAULT_DURATION}] }
         
 
 
