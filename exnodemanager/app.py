@@ -13,6 +13,7 @@ import sys
 import urllib2
 import json
 import tornado
+import datetime
 
 from ws4py.client.tornadoclient import TornadoWebSocketClient
 
@@ -98,7 +99,7 @@ class DispatcherApplication(object):
                     duration = self._protocol.Manage(source, extent, duration=duration)
                     if duration:
                         newExtent = extent
-                        newExtent["lifetimes"][0]["start"] = datetime.datetime.now().strptime("%Y-%m-%d %H:%M:%S")
+                        newExtent["lifetimes"][0]["start"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                         newExtent["lifetimes"][0]["end"]   = datetime.datetime.now() + duration
                         self._db.UpdateExtent(newExtent)
                     else:
@@ -117,7 +118,7 @@ class DispatcherApplication(object):
                                       "parent":  extent["parent"],
                                       "mapping": response["caps"] }
 
-                        newExtent["lifetimes"][0]["start"] = datetime.datetime.now().strptime("%Y-%m-%d %H:%M:%S")
+                        newExtent["lifetimes"][0]["start"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                         newExtent["lifetimes"][0]["end"]   = datetime.datetime.now() + response["duration"]
                         self._db.UpdateExtent(newExtent)
                         
@@ -127,19 +128,43 @@ class DispatcherApplication(object):
 
 
 class PurgeApplication(DispatcherApplication):
+    def __init__(self):
+        logging.info("__init__: Creating new Dispatcher")
+        self._policy   = policy.RefreshPolicy()
+        self._protocol = protocol.IBPProtocol()
+        self._db       = db.UnisProxy(unis_settings.UNIS_HOST, unis_settings.UNIS_PORT)
+
+    # Register all currently availible exnodes on UNIS to the policy
+        exnodes = self._db.GetExnodes()
+        for exnode in exnodes:
+            tmpResult = self._policy.RegisterExnode(exnode)
+
+    # Register all currently availible extents on UNIS to the policy
+    # and register their id in the action priority queue
+        extents = self._db.GetExtents()
+        for extent in extents:
+            tmpResult = self._policy.RegisterExtent(extent, allow_old=True)
+
     def Run(self):
         extents = self._policy.extentList()
+        i = 1
 
-        for extent in extents:
-            address = extent["mapping"]["read"].slipt("/")
+        for key, extent in extents.iteritems():
+            extent = extent["data"]
+            address = extent["mapping"]["read"].split("/")
             address = dict(zip(["host", "port"], address[2].split(":")))
-            logging.info("app.Run: Purging   {0}   from   {1}".format(extent["id"], address))
-
-            self._protocol.Release(address, extent)
+            logging.info("app.Run: [{current}/{total}]Purging   {id}   from   {host}:{port}".format(current = i,
+                                                                                                    total   = len(extents),
+                                                                                                    id      = extent["id"], 
+                                                                                                    host    = address["host"], 
+                                                                                                    port    = address["port"])) 
             
+            self._protocol.Release(address, extent)
+            print "\n"
             newExtent = extent
-            newExtent["lifetimes"][0]["end"]   = datetime.datetime.now()
+            newExtent["lifetimes"][0]["end"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             self._db.UpdateExtent(newExtent)
+            i += 1
 
 
 

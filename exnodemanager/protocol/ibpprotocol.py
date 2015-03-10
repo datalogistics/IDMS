@@ -19,6 +19,7 @@ import urllib2
 import socket
 
 import settings
+from settings import print_error
 from protocol import Protocol
 
 class IBPProtocol(Protocol):
@@ -27,7 +28,7 @@ class IBPProtocol(Protocol):
     # Query the status of a Depot.
     
     # Generate request with the following form
-    # PROTOCOL_VERSION[0] IBP_ST_INQ[2] pwd timeout
+    # IBPv031[0] IBP_ST_INQ[2] pwd timeout
         pwd = settings.DEFAULT_PASSWORD
         timeout = settings.DEFAULT_TIMEOUT
         tmpCommand = ""
@@ -38,21 +39,18 @@ class IBPProtocol(Protocol):
             timeout = kwargs["timeout"]
         
         try:
-            tmpCommand = "{0} {1} {2} {3} {4}\n".format(settings.PROTOCOL_VERSION, settings.IBP_STATUS, settings.IBP_ST_INQ, pwd, timeout)
+            tmpCommand = "{0} {1} {2} {3} {4}\n".format(settings.IBPv031, settings.IBP_STATUS, settings.IBP_ST_INQ, pwd, timeout)
             result = self._dispatch_command(address["host"], address["port"], tmpCommand)
-            logging.debug("IBPProtocol.GetStatus: Recievd - {result}".format(result = result))
             result = result.split(" ")
         except Exception as exp:
-            logging.warn("IBPProtocol.GetStatus: Failed to get the status of {host}:{port}".format(**address))
-            logging.warn("                       -- Request: {command}".format(command = tmpCommand))
-            logging.warn("                       -- Error:   {error}".format(error = exp))
+            logging.warn("IBPProtocol.GetStatus: Failed to get the status of {host}:{port} - {err}".format(err = exp, **address))
             return None
             
         return dict(zip(["total", "used", "volatile", "used-volatile", "max-duration"], result))
         
     def Allocate(self, address, size, **kwargs):
     # Generate destination Allocation and Capabilities using the form below
-    # PROTOCOL_VERSION[0] IBP_ALLOCATE[1] reliability cap_type duration size timeout
+    # IBPv031[0] IBP_ALLOCATE[1] reliability cap_type duration size timeout
         reliability = settings.IBP_HARD
         cap_type    = settings.IBP_BYTEARRAY
         timeout     = settings.DEFAULT_TIMEOUT
@@ -69,16 +67,15 @@ class IBPProtocol(Protocol):
             timeout = kwargs["timeout"]
 
         try:
-            print "size: {0}".format(size)
-            tmpCommand = "{0} {1} {2} {3} {4} {5} {6} \n".format(settings.PROTOCOL_VERSION, settings.IBP_ALLOCATE, reliability, cap_type, duration, size, timeout)
+            tmpCommand = "{0} {1} {2} {3} {4} {5} {6} \n".format(settings.IBPv031, settings.IBP_ALLOCATE, reliability, cap_type, duration, size, timeout)
             result = self._dispatch_command(address["host"], address["port"], tmpCommand)
             result = result.split(" ")[1:]
         except Exception as exp:
-            logging.warn("IBPProtocol.Allocate: Failed to allocate resource at {host}:{port}".format(**address))
-            logging.warn("                      -- Request: {command}".format(command = tmpCommand))
-            logging.warn("                      -- Error:   {error}".format(error = exp))
+            logging.warn("IBPProtocol.Allocate: Could not connect to {host}:{port} - {err}".format(err = exp, **address))
             return None
         
+        if result[0].startswith("-"):
+            logging.warn("IBPProtocol.Allocate: Failed to allocate resource - {err}".format(err = print_error(result[0])))
         result = dict(zip(["read", "write", "manage"], result))
         return result
 
@@ -96,22 +93,20 @@ class IBPProtocol(Protocol):
         dest_caps = self._get_caps(cap_urls)
 
         try:
-            tmpCommand = "{0} {1} {2} {3} {4} {5}\n".format(settings.PROTOCOL_VERSION, settings.IBP_STORE, dest_caps["write"]["key"], dest_caps["write"]["wrm_key"], size, timeout)
+            tmpCommand = "{0} {1} {2} {3} {4} {5}\n".format(settings.IBPv031, settings.IBP_STORE, dest_caps["write"]["key"], dest_caps["write"]["wrm_key"], size, timeout)
             result = self._dispatch_command(address["host"], address["port"], tmpCommand)
             result = result.split(" ")
-        except:
-            logging.warn("IBPProtocol.Store: Failed to store data at {host}:{port}".format(**address))
-            logging.warn("                   -- Request: {command}".format(command = tmpCommand))
+        except Exception as exp:
+            logging.warn("IBPProtocol.Store: Could not connect to {host}:{port} - {err}".format(err = exp, **addres))
             return None
-
+            
         if result[0].startswith("-"):
-            logging.warn("IBPProtocol.Store: Could not store extent - {0}".format(result))
-            logging.warn("                   -- Request: {command}".format(command = tmpCommand))
+            logging.warn("IBPProtocol.Store: Failed to store resource - {err}".format(err = print_error(result[0])))
             return None
         else:
             return {"caps": cap_urls, "duration": duration }
 
-    
+            
     def Copy(self, source, destination, extent, **kwargs):
         return self.Move(source, destination, extent, **kwargs)
     
@@ -126,17 +121,16 @@ class IBPProtocol(Protocol):
         if "duration" in kwargs:
             duration = kwargs["duration"]
 
-    # Generate caps from data
+            # Generate caps from data
         src_caps  = self._get_caps(extent["mapping"])
         cap_urls  = self.Allocate(destination, 10000, **kwargs)
         dest_caps = self._get_caps(cap_urls)
         
         tmpExtent = { "mapping": cap_urls, "size": extent["size"] }
-        print self.Probe(destination, tmpExtent)
     # Generate move request with the following form
-    # PROTOCOL_VERSION[0] IBP_SEND[5] src_read_key dest_write_key src_WRMKey offset size timeout timeout timeout
+    # IBPv031[0] IBP_SEND[5] src_read_key dest_write_key src_WRMKey offset size timeout timeout timeout
         try:
-            tmpCommand = "{0} {1} {2} {3} {4} {5} {6} {7} {7} {7} \n".format( settings.PROTOCOL_VERSION,
+            tmpCommand = "{0} {1} {2} {3} {4} {5} {6} {7} {7} {7} \n".format( settings.IBPv031,
                                                                               settings.IBP_SEND,
                                                                               src_caps["read"]["key"],
                                                                               dest_caps["write"]["key"],
@@ -146,22 +140,31 @@ class IBPProtocol(Protocol):
                                                                               timeout
                                                                        )
             result = self._dispatch_command(source["host"], source["port"], tmpCommand)
+            result = result.split(" ")
         except Exception as exp:
-            logging.warn("IBPProtocol.Move: Failed to move resource from {host1}:{port1} to {host2}:{port2} - {e}".format(host1 = source["host"], port1 = source["port"], host2 = destination["host"], port2 = destination["port"], e = exp))
-            logging.warn("                  -- Request: {command}".format(command = tmpCommand))
+            logging.warn("IBPProtocol.Move: Could not connect to {host1}:{port1} - {e}".format(host1 = source["host"], port1 = source["port"], e = exp))
             return None
-         
+
         if result.startswith("-"):
-            logging.warn("IBPProtocol.Move: Could not move extent - {0}".format(result))
-            logging.warn("                  -- Request: {command}".format(command = tmpCommand))
+            logging.warn("IBPProtocol.Move: Failed to move extent - {err}".format(err = print_error(result[0])))
             return None
         else:
-            result = result.split(" ")
             return {"caps": cap_urls, "duration": duration }
-   
+                         
 
     def Release(self, address, extent, **kwargs):
-        return self.Manage(address, extent, duration = 1)
+        logging.info("IBPProtocol.Release: Getting details for   {0}".format(extent["id"]))
+        details = self.Probe(address, extent)
+        
+        if details:
+            logging.info("   Extent currently has  {0}  reader(s)".format(details["read_count"]))
+            for i in range(1, int(details["read_count"]) + 1):
+                self._remove_reader(address, extent)
+                logging.info("    {0} readers removed".format(i))
+        else:
+            return None
+
+        return details["read_count"]
 
 
     def Manage(self, address, extent, **kwargs):
@@ -173,7 +176,7 @@ class IBPProtocol(Protocol):
         tmpCommand  = ""
 
     # Generate manage request with the following form
-    # PROTOCOL_VERSION[0] IBP_MANAGE[9] manage_key "MANAGE" IBP_CHANGE[43] cap_type max_size duration reliability timeout
+    # IBPv031[0] IBP_MANAGE[9] manage_key "MANAGE" IBP_CHANGE[43] cap_type max_size duration reliability timeout
         if "cap_type" in kwargs:
             cap_type = kwargs["cap_type"]
         if "reliability" in kwargs:
@@ -187,7 +190,7 @@ class IBPProtocol(Protocol):
             
         try:
             caps = self._get_caps(extent["mapping"])
-            tmpCommand = "{0} {1} {2} {3} {4} {5} {6} {7} {8} {9}\n".format(settings.PROTOCOL_VERSION,
+            tmpCommand = "{0} {1} {2} {3} {4} {5} {6} {7} {8} {9}\n".format(settings.IBPv031,
                                                                             settings.IBP_MANAGE,
                                                                             caps["manage"]["key"],
                                                                             caps["manage"]["type"],
@@ -199,14 +202,12 @@ class IBPProtocol(Protocol):
                                                                             timeout
                                                                             )
             result = self._dispatch_command(address["host"], address["port"], tmpCommand)
-        except:
-            logging.warn("IBPProtocol.Manage: Failed to manage extent at {host}:{port}".format(**address))
-            logging.warn("                    -- Request: {command}".format(command = tmpCommand))
+        except Exception as exp:
+            logging.warn("IBPProtocol.Manage: Could not connect to {host}:{port} - {err}".format(err = exp, **address))
             return None
 
         if result.startswith("-"):
-            logging.warn("IBPProtocol.Manage: Could not manage extent - {0}".format(result))
-            logging.warn("                   -- Request: {command}".format(command = tmpCommand))
+            logging.warn("IBPProtocol.Manage: Failed to manage allocation - {err}".format(err = print_error(result[0])))
             return None
         else:
             return True
@@ -232,7 +233,7 @@ class IBPProtocol(Protocol):
 
         try:
             caps = self._get_caps(extent["mapping"])
-            tmpCommand = "{0} {1} {2} {3} {4} {5} {6} {7} {8} {9}\n".format(settings.PROTOCOL_VERSION,
+            tmpCommand = "{0} {1} {2} {3} {4} {5} {6} {7} {8} {9}\n".format(settings.IBPv031,
                                                                             settings.IBP_MANAGE,
                                                                             caps["manage"]["key"],
                                                                             caps["manage"]["type"],
@@ -244,25 +245,59 @@ class IBPProtocol(Protocol):
                                                                             timeout
                                                                             )
             result = self._dispatch_command(address["host"], address["port"], tmpCommand)
-            logging.debug(result)
             result = result.split(" ")
-        except:
-            logging.warn("IBPProtocol.Manage: Failed to manage extent at {host}:{port}".format(**address))
-            logging.warn("                    -- Request: {command}".format(command = tmpCommand))
+        except Exception as exp:
+            logging.warn("IBPProtocol.Manage: Could not connect to {host}:{port} - {err}".format(err = exp, **address))
             return None
 
         if result[0].startswith("-"):
-            logging.warn("IBPProtocol.Store: Could not probe extent - {0}".format(result))
-            logging.warn("                   -- Request: {command}".format(command = tmpCommand))
+            logging.warn("IBPProtocol.Store: Failed to probe allocation - {err}".format(err = print_error(result[0])))
             return None
         else:
             return dict(zip(["read_count", "write_count", "size", "max_size", "duration", "reliability", "type"], result[1:]))
 
         
+
+
+    def _remove_reader(self, address, extent):
+        reliability = settings.IBP_HARD
+        timeout     = settings.DEFAULT_TIMEOUT
+        duration    = settings.DEFAULT_DURATION
+        tmpCommand  = ""
+
+    # Generate manage request with the following form
+    # IBPv031[0] IBP_MANAGE[9] manage_key "MANAGE" IBP_CHANGE[43] READCAP[1] max_size duration reliability timeout
+        try:
+            caps = self._get_caps(extent["mapping"])
+            tmpCommand = "{0} {1} {2} {3} {4} {5} {6} {7} {8} {9}\n".format(settings.IBPv031,
+                                                                            settings.IBP_MANAGE,
+                                                                            caps["manage"]["key"],
+                                                                            caps["manage"]["type"],
+                                                                            settings.IBP_DECR,
+                                                                            settings.IBP_READCAP,
+                                                                            settings.DEFAULT_MAXSIZE,
+                                                                            duration,
+                                                                            reliability,
+                                                                            timeout
+                                                                            )
+            result = self._dispatch_command(address["host"], address["port"], tmpCommand)
+        except Exception as exp:
+            logging.warn("IBPProtocol.Manage: Could not connect to {host}:{port} - {err}".format(err = exp, **address))
+            return None
+
+        if result.startswith("-"):
+            logging.warn("IBPProtocol.Manage: Failed to decrement read cap - {err}".format(err = print_error(result[0])))
+            return None
+        else:
+            return True
+        
+
+
         
         
     def _dispatch_command(self, host, port, command):
     # Create socket and configure with host and port
+        port = int(port)
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(10)
         sock.connect((host, port))

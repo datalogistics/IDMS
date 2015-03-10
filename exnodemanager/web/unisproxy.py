@@ -18,7 +18,7 @@ class UnisProxy(object):
                                                                    port       = settings.UNIS_PORT,
                                                                    collection = "extents")
             request = urllib2.Request(url, data=json.dumps(extent))
-            request.add_header("Content-Type", "application/perfsonar+json")            
+            request.add_header("Content-Type", "application/perfsonar+json")
             response = urllib2.urlopen(request, timeout=20).read()
         except urllib2.URLError as exp:
             logging.error("UnisBridge.UpdateExtent: %s" % exp)

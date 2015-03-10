@@ -64,14 +64,14 @@ class Policy(object):
     # @output: Dictionary containing the id and priority of the extent
     # @description:
     #      This function adds an extent to the currently known extents to upkeep.
-    def RegisterExtent(self, extent):
+    def RegisterExtent(self, extent, allow_old = False):
         logging.info("Policy.RegisterExtent: Registering extent - {0}".format(extent["id"]))
 
         expires = datetime.datetime.strptime(extent["lifetimes"][0]["end"], "%Y-%m-%d %H:%M:%S")
         priority = (expires - datetime.datetime(1970, 1, 1))
         priority = (priority.days * 1440) + priority.seconds
         
-        if expires < datetime.datetime.now():
+        if expires < datetime.datetime.now() and not allow_old:
             logging.info("Policy.RegisterExtent: Extent is old, did not register")
             return None
         
