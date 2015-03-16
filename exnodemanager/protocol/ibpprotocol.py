@@ -145,7 +145,7 @@ class IBPProtocol(Protocol):
             logging.warn("IBPProtocol.Move: Could not connect to {host1}:{port1} - {e}".format(host1 = source["host"], port1 = source["port"], e = exp))
             return None
 
-        if result.startswith("-"):
+        if result[0].startswith("-"):
             logging.warn("IBPProtocol.Move: Failed to move extent - {err}".format(err = print_error(result[0])))
             return None
         else:
@@ -341,7 +341,7 @@ def RunUnitTests():
 
     host1 = "dresci.incntre.iu.edu"
     port1 = 6714
-    host2 = "128.120.83.7"
+    host2 = "128.120.83.5"
     port2 = 6714
 
     if args.start_depot_host:
@@ -400,43 +400,43 @@ def RunUnitTests():
     result = ""
     result = proto.Probe(address = {"host": host1, "port": port1}, extent = tmpExtent)
 
-    assert result
-    print result
+#    assert result
+#    print result
 
-    result = ""
-    result = proto.Release(address = {"host": host1, "port": port1}, extent = tmpExtent)
+#    result = ""
+#    result = proto.Release(address = {"host": host1, "port": port1}, extent = tmpExtent)
     
-    assert result
+#    assert result
 
-    result = ""
-    result = proto.Probe(address = {"host": host1, "port": port1}, extent = tmpExtent)
+#    result = ""
+#    result = proto.Probe(address = {"host": host1, "port": port1}, extent = tmpExtent)
 
-    assert result
-    print result
+#    assert result
+#    print result
 
 
     # TODO: Debug Move command
     # Move Dummy data to second depot
-#    result = proto.Move(source      = {"host": host1, "port": port1}, 
-#                        destination = {"host": host2, "port": port2}, 
-#                        extent      = tmpExtent, 
-#                        duration    = 3600)
+    result = proto.Move(source      = {"host": host1, "port": port1}, 
+                        destination = {"host": host2, "port": port2}, 
+                        extent      = tmpExtent, 
+                        duration    = 3600)
 
 
-#    assert result
-#    assert result["duration"] == 3600
-#    print result
+    assert result
+    assert result["duration"] == 3600
+    print result
 
     # Build second temporary psudo-extent for managing second depot
-#    tmpExtent2 = { "mapping": result["caps"], "size": size }
+    tmpExtent2 = { "mapping": result["caps"], "size": size }
     
     # Check duration for data on second depot
-#    result = proto.Manage(address = {"host": host1, "port": port1}, extent = tmpExtent)
+    result = proto.Manage(address = {"host": host1, "port": port1}, extent = tmpExtent)
     
-#    assert result
-#    print result
+    assert result
+    print result
 
-#    result = proto.Manage(address = {"host": host2, "port": port2}, extent = tmpExtent2)
+    result = proto.Manage(address = {"host": host2, "port": port2}, extent = tmpExtent2)
 
 if __name__ == "__main__":
     RunUnitTests()
