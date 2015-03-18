@@ -1,4 +1,19 @@
 
 
-refresh_tolerence = { "hours": 10 }
-DEFAULT_DURATION  = 3600 * 32 # 32 hours
+############################################
+#                                          #
+#            Generic Settings              #
+#                                          #
+############################################
+refresh_tolerence = { "hours": 3 }
+DEFAULT_DURATION  = 3600 * 3 # 32 hours
+
+
+
+
+############################################
+#                                          #
+#          Sliding Window Policy           #
+#                                          #
+############################################
+DEFAULT_WINDOW = 60 * 60 * 24 * 30 # 30 days

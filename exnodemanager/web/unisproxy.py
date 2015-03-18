@@ -11,6 +11,7 @@ class UnisProxy(object):
 
     def UpdateExtent(self, extent):
     # Attempt to push a new extent to UNIS
+        extent.pop("_id", None)
         extent.pop("id", None)
         try:
             url = "{protocol}://{host}:{port}/{collection}".format(protocol   = settings.UNIS_PROTOCOL,

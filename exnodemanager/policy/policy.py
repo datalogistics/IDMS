@@ -93,6 +93,20 @@ class Policy(object):
 
 
 
+    # ClearExtent
+    # @input:  extent id referencing extent to be cleared from pending list
+    # @output: Boolean success or failure flag
+    # @decription:
+    #     ClearExtent is called after handling a pending extent to declare that it is
+    #     no longer an extent of interest.
+    def ClearExtent(self, extent_id):
+        for event in self._event_queue:
+            print event
+            if event["id"] == extent_id:
+                self._event_queue.remove(event)
+                break
+
+
     # ProcessExtent
     # @input:  uuid that points to an extent.
     # @output: Dictionary including the extent to be altered and the addresses
@@ -126,7 +140,7 @@ class Policy(object):
         self._event_queue = sorted(self._event_queue, key = lambda event: event["priority"])
         
         for event in self._event_queue:
-            if event["expires"] - datetime.datetime.now() < tmpTolerence:
+            if event["expires"] - datetime.datetime.utcnow() < tmpTolerence:
                 tmpPending.append(event["id"])
                 logging.debug("diff: {0}".format(event["expires"] - datetime.datetime.now()))
             else:
@@ -143,10 +157,17 @@ class Policy(object):
     #      Returns if there are currently pending extents ready for update.
     def hasPending(self):
         # Check if the first event is within the current tolerence
-        self._event_queue = sorted(self._event_queue, key = lambda event: event["priority"])
-        tmpExpires = self._event_queue[0]["expires"]
-        
-        return tmpExpires - datetime.datetime.now() < datetime.timedelta(**settings.refresh_tolerence)
+        try:
+            self._event_queue = sorted(self._event_queue, key = lambda event: event["priority"])
+            tmpExpires = self._event_queue[0]["expires"]
+            logging.debug("Policy.hasPending: Now - {now}  ||  Expires - {expires}".format(now = datetime.datetime.utcnow(), expires = tmpExpires))
+            logging.debug("Policy.hasPending: Diff - {diff} || {value}".format(diff  = tmpExpires - datetime.datetime.utcnow(), 
+                                                                               value = tmpExpires - datetime.datetime.utcnow() < datetime.timedelta(**settings.refresh_tolerence)))
+        except Exception as exp:
+            logging.warn("Policy.hasPending: Could not check pening list - {0}".format(exp))
+            return False
+
+        return tmpExpires - datetime.datetime.utcnow() < datetime.timedelta(**settings.refresh_tolerence)
 
 
 

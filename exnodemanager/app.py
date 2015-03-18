@@ -86,9 +86,10 @@ class DispatcherApplication(object):
         try:
             extent = instruction["extent"]
             source = extent["mapping"]["read"].split("/")
-            source = dict(zip(["host", "port"], address[2].split(":")))
+            source = dict(zip(["host", "port"], source[2].split(":")))
+            res_id = extent["id"]
 
-            for destination in instructions["addresses"]:
+            for destination in instruction["addresses"]:
                 if "duration" in destination:
                     duration = destination["duration"]
                 else:
@@ -96,12 +97,12 @@ class DispatcherApplication(object):
 
                 # Instruction is a refresh in place
                 if source == destination["address"]:
-                    duration = self._protocol.Manage(source, extent, duration=duration)
-                    if duration:
+                    if self._protocol.Manage(source, extent, duration=duration):
+                        duration = datetime.timedelta(seconds=duration)
                         newExtent = extent
-                        newExtent["lifetimes"][0]["start"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        newExtent["lifetimes"][0]["end"]   = datetime.datetime.now() + duration
-                        self._db.UpdateExtent(newExtent)
+                        newExtent["lifetimes"][0]["end"]   = (datetime.datetime.utcnow() + duration).strftime("%Y-%m-%d %H:%M:%S")
+                        if self._db.UpdateExtent(newExtent):
+                            self._policy.ClearExtent(res_id)
                     else:
                         logging.warn("app._process_instructions:  Failed to change duration on depot")
 
@@ -116,11 +117,14 @@ class DispatcherApplication(object):
                                       "size":    extent["size"], 
                                       "offset":  extent["offset"], 
                                       "parent":  extent["parent"],
-                                      "mapping": response["caps"] }
+                                      "mapping": response["caps"] 
 
-                        newExtent["lifetimes"][0]["start"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        newExtent["lifetimes"][0]["end"]   = datetime.datetime.now() + response["duration"]
-                        self._db.UpdateExtent(newExtent)
+                        newExtent["lifetimes"][0]["start"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+                        newExtent["lifetimes"][0]["end"]   = (datetime.datetime.utcnow() + duration).strftime("%Y-%m-%d %H:%M:%S")
+                        if self._db.UpdateExtent(newExtent):
+                            self._policy.ClearExtent(res_id)
+                    else:
+                        logging.warn("app._process_instructions:  Failed to change duration on depot")
                         
                         
         except Exception as exp:
@@ -157,12 +161,12 @@ class PurgeApplication(DispatcherApplication):
                                                                                                     total   = len(extents),
                                                                                                     id      = extent["id"], 
                                                                                                     host    = address["host"], 
-                                                                                                    port    = address["port"])) 
+                                                                                                    port    = address["port"]))
             
             self._protocol.Release(address, extent)
             print "\n"
             newExtent = extent
-            newExtent["lifetimes"][0]["end"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            newExtent["lifetimes"][0]["end"] = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
             self._db.UpdateExtent(newExtent)
             i += 1
 
