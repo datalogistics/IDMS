@@ -117,9 +117,9 @@ class DispatcherApplication(object):
                                       "size":    extent["size"], 
                                       "offset":  extent["offset"], 
                                       "parent":  extent["parent"],
-                                      "mapping": response["caps"] 
+                                      "mapping": response["caps"] }
 
-                        newExtent["lifetimes"][0]["start"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+                        newExtent["lifetimes"][0]["start"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                         newExtent["lifetimes"][0]["end"]   = (datetime.datetime.utcnow() + duration).strftime("%Y-%m-%d %H:%M:%S")
                         if self._db.UpdateExtent(newExtent):
                             self._policy.ClearExtent(res_id)

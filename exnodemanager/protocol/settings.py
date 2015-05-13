@@ -135,4 +135,7 @@ error = {
 
 
 def print_error(key):
-    return error[key]
+    if key in error:
+        return error[key]
+    else:
+        return "Unknown Error"
