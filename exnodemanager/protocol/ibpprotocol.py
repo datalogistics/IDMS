@@ -41,6 +41,8 @@ class IBPProtocol(Protocol):
         try:
             tmpCommand = "{0} {1} {2} {3} {4}\n".format(settings.IBPv031, settings.IBP_STATUS, settings.IBP_ST_INQ, pwd, timeout)
             result = self._dispatch_command(address["host"], address["port"], tmpCommand)
+            if not result:
+                return None
             result = result.split(" ")
         except Exception as exp:
             logging.warn("IBPProtocol.GetStatus: Failed to get the status of {host}:{port} - {err}".format(err = exp, **address))
@@ -69,6 +71,8 @@ class IBPProtocol(Protocol):
         try:
             tmpCommand = "{0} {1} {2} {3} {4} {5} {6} \n".format(settings.IBPv031, settings.IBP_ALLOCATE, reliability, cap_type, duration, size, timeout)
             result = self._dispatch_command(address["host"], address["port"], tmpCommand)
+            if not result:
+                return None
             result = result.split(" ")[1:]
         except Exception as exp:
             logging.warn("IBPProtocol.Allocate: Could not connect to {host}:{port} - {err}".format(err = exp, **address))
@@ -95,6 +99,8 @@ class IBPProtocol(Protocol):
         try:
             tmpCommand = "{0} {1} {2} {3} {4} {5}\n".format(settings.IBPv031, settings.IBP_STORE, dest_caps["write"]["key"], dest_caps["write"]["wrm_key"], size, timeout)
             result = self._dispatch_command(address["host"], address["port"], tmpCommand)
+            if not result:
+                return None
             result = result.split(" ")
         except Exception as exp:
             logging.warn("IBPProtocol.Store: Could not connect to {host}:{port} - {err}".format(err = exp, **addres))
@@ -140,6 +146,8 @@ class IBPProtocol(Protocol):
                                                                               timeout
                                                                        )
             result = self._dispatch_command(source["host"], source["port"], tmpCommand)
+            if not result:
+                return None
             result = result.split(" ")
         except Exception as exp:
             logging.warn("IBPProtocol.Move: Could not connect to {host1}:{port1} - {e}".format(host1 = source["host"], port1 = source["port"], e = exp))
@@ -202,11 +210,14 @@ class IBPProtocol(Protocol):
                                                                             timeout
                                                                             )
             result = self._dispatch_command(address["host"], address["port"], tmpCommand)
+            if not result:
+                return None
+            result = result.split(" ")
         except Exception as exp:
             logging.warn("IBPProtocol.Manage: Could not connect to {host}:{port} - {err}".format(err = exp, **address))
             return None
 
-        if result.startswith("-"):
+        if result[0].startswith("-"):
             logging.warn("IBPProtocol.Manage: Failed to manage allocation - {err}".format(err = print_error(result[0])))
             return None
         else:
@@ -245,6 +256,8 @@ class IBPProtocol(Protocol):
                                                                             timeout
                                                                             )
             result = self._dispatch_command(address["host"], address["port"], tmpCommand)
+            if not result:
+                return None
             result = result.split(" ")
         except Exception as exp:
             logging.warn("IBPProtocol.Manage: Could not connect to {host}:{port} - {err}".format(err = exp, **address))
@@ -281,11 +294,14 @@ class IBPProtocol(Protocol):
                                                                             timeout
                                                                             )
             result = self._dispatch_command(address["host"], address["port"], tmpCommand)
+            if not result:
+                return None
+            result = result.split(" ")
         except Exception as exp:
             logging.warn("IBPProtocol.Manage: Could not connect to {host}:{port} - {err}".format(err = exp, **address))
             return None
 
-        if result.startswith("-"):
+        if result[0].startswith("-"):
             logging.warn("IBPProtocol.Manage: Failed to decrement read cap - {err}".format(err = print_error(result[0])))
             return None
         else:
