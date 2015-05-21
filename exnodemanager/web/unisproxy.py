@@ -1,5 +1,5 @@
 import json
-import urllib2
+import requests
 import logging
 
 import settings as settings
@@ -11,59 +11,68 @@ class UnisProxy(object):
 
     def UpdateExtent(self, extent):
     # Attempt to push a new extent to UNIS
-        extent.pop("_id", None)
-        extent.pop("id", None)
         try:
-            url = "{protocol}://{host}:{port}/{collection}".format(protocol   = settings.UNIS_PROTOCOL,
-                                                                   host       = settings.UNIS_HOST,
-                                                                   port       = settings.UNIS_PORT,
-                                                                   collection = "extents")
-            request = urllib2.Request(url, data=json.dumps(extent))
-            request.add_header("Content-Type", "application/perfsonar+json")
-            response = urllib2.urlopen(request, timeout=20).read()
-        except urllib2.URLError as exp:
+            url = "{protocol}://{host}:{port}/{collection}/{eid}".format(protocol   = settings.UNIS_PROTOCOL,
+                                                                         host       = settings.UNIS_HOST,
+                                                                         port       = settings.UNIS_PORT,
+                                                                         collection = "extents",
+                                                                         eid        = extent["id"])
+
+            headers  = {'Content-Type': 'application/perfsonar+json'}
+            response = requests.put(url, data = json.dumps(extent), headers = headers)
+            response = response.json()
+#            request = urllib2.Request(url, data=json.dumps(extent))
+#            request.add_header("Content-Type", "application/perfsonar+json")
+#            response = urllib2.urlopen(request, timeout=20).read()
+        except requests.exceptions.RequestException as exp:
             logging.error("UnisBridge.UpdateExtent: %s" % exp)
             return False
+        except ValueError as exp:
+            logging.error("UnisBridge.UpdateExtent: {exp}".format(exp = exp))
+            logging.error("                         {err}".format(err = response.text))
+            return False
 
-        return json.loads(response)
+        return response
 
     def GetExnodes(self):
     # Attempt to get a list of file exnodes from UNIS
         try:
-            url = "{protocol}://{host}:{port}/{collection}?{options}".format(protocol   = settings.UNIS_PROTOCOL,
-                                                                             host       = settings.UNIS_HOST,
-                                                                             port       = settings.UNIS_PORT,
-                                                                             collection = "exnodes",
-                                                                             options    = "mode=file")
-                                                                             #options    = "mode=file&fields=id,parent,size,name,properties")
-            request = urllib2.Request(url)
-            request.add_header("Accept", "application/perfsonar+json")
+            url = "{protocol}://{host}:{port}/{collection}".format(protocol   = settings.UNIS_PROTOCOL,
+                                                                   host       = settings.UNIS_HOST,
+                                                                   port       = settings.UNIS_PORT,
+                                                                   collection = "exnodes")
+            #options    = "mode=file")
+            #options    = "mode=file&fields=id,parent,size,name,properties")
             
-            response = urllib2.urlopen(request, timeout=20).read()
-        except urllib2.URLError as exp:
+            response = requests.get(url, params = {"mode": "file"}, headers = {"Accept": "application/perfsonar+json"}).json()
+#            request = urllib2.Request(url)
+#            request.add_header("Accept", "application/perfsonar+json")
+            
+#            response = urllib2.urlopen(request, timeout=20).read()
+        except requests.exceptions.RequestException as exp:
             logging.error("UnisBridge.GetExnode: %s" % exp)
             return False
             
-        return json.loads(response)
+        return response
 
         
     def GetExtents(self):
     # Attempt to get a list of file extents from UNIS
         try:
-            url = "{protocol}://{host}:{port}/{collection}?{options}".format(protocol   = settings.UNIS_PROTOCOL,
-                                                                             host       = settings.UNIS_HOST,
-                                                                             port       = settings.UNIS_PORT,
-                                                                             collection = "extents",
-                                                                             options    = "")
-            request = urllib2.Request(url)
-            request.add_header("Accept", "application/perfsonar+json")
+            url = "{protocol}://{host}:{port}/{collection}".format(protocol   = settings.UNIS_PROTOCOL,
+                                                                   host       = settings.UNIS_HOST,
+                                                                   port       = settings.UNIS_PORT,
+                                                                   collection = "extents")
+            response = requests.get(url, headers = {'Accept': 'application/perfsonar+json'}).json()
+#            request = urllib2.Request(url)
+#            request.add_header("Accept", "application/perfsonar+json")
             
-            response = urllib2.urlopen(request, timeout=20).read()
-        except urllib2.URLError as exp:
+#            response = urllib2.urlopen(request, timeout=20).read()
+        except requests.exceptions.RequestException as exp:
             logging.error("UnisBridge.GetExtent: %s" % exp)
             return False
             
-        return json.loads(response)
+        return response
 
 
 
