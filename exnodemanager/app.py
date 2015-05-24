@@ -16,6 +16,7 @@ import tornado
 import datetime
 
 from ws4py.client.tornadoclient import TornadoWebSocketClient
+import concurrent.futures
 
 import settings
 import web.settings as unis_settings
@@ -151,25 +152,24 @@ class PurgeApplication(DispatcherApplication):
 
     def Run(self):
         extents = self._policy.extentList()
-        i = 1
+        
+        with concurrent.futures.ThreadPoolExecutor(max_workers = settings.THREADS) as executor:
+            for result in executor.map(self.purge_worker, extents):
+                logging.info(result)
 
-        for key, extent in extents.iteritems():
-            extent = extent["data"]
-            address = extent["mapping"]["read"].split("/")
-            address = dict(zip(["host", "port"], address[2].split(":")))
-            logging.info("app.Run: [{current}/{total}]Purging   {id}   from   {host}:{port}".format(current = i,
-                                                                                                    total   = len(extents),
-                                                                                                    id      = extent["id"], 
-                                                                                                    host    = address["host"], 
-                                                                                                    port    = address["port"]))
-            
-            self._protocol.Release(address, extent)
-            print "\n"
-            newExtent = extent
-            newExtent["lifetimes"][0]["end"] = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
-            self._db.UpdateExtent(newExtent)
-            i += 1
 
+    def purge_worker(self, extent):
+        extent = self._policy.extentList()[extent]
+        extent = extent["data"]
+        address = extent["mapping"]["read"].split("/")
+        address = dict(zip(["host", "port"], address[2].split(":")))
+        
+        result, log = self._protocol.Release(address, extent)
+        newExtent = extent
+        newExtent["lifetimes"][0]["end"] = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+        result, log2 = self._db.UpdateExtent(newExtent)
+        
+        return log + log2
 
 
 def main():

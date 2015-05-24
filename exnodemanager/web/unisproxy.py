@@ -25,14 +25,12 @@ class UnisProxy(object):
 #            request.add_header("Content-Type", "application/perfsonar+json")
 #            response = urllib2.urlopen(request, timeout=20).read()
         except requests.exceptions.RequestException as exp:
-            logging.error("UnisBridge.UpdateExtent: %s" % exp)
-            return False
+#            logging.error("UnisBridge.UpdateExtent: %s" % exp)
+            return False, "UnisBridge.UpdateExtent: {exp}\n".format(exp = exp)
         except ValueError as exp:
-            logging.error("UnisBridge.UpdateExtent: {exp}".format(exp = exp))
-            logging.error("                         {err}".format(err = response.text))
-            return False
+            return False, "UnisBridge.UpdateExtent: {exp}\n, {err}\n".format(exp = exp, err = response.text)
 
-        return response
+        return response, ""
 
     def GetExnodes(self):
     # Attempt to get a list of file exnodes from UNIS

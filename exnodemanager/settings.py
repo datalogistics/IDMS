@@ -13,3 +13,10 @@ LOG_PATH  = ""
 ####################
 
 ITERATION_TIME = 20 # Time between checks in seconds
+
+
+########################
+# Concurrency Settings #
+########################
+
+THREADS = 20

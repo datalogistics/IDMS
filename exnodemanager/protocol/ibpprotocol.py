@@ -161,18 +161,18 @@ class IBPProtocol(Protocol):
                          
 
     def Release(self, address, extent, **kwargs):
-        logging.info("IBPProtocol.Release: Getting details for   {0}".format(extent["id"]))
-        details = self.Probe(address, extent)
+#        logging.info("IBPProtocol.Release: Getting details for   {0}".format(extent["id"]))
+        details, log = self.Probe(address, extent)
         
         if details:
-            logging.info("   Extent currently has  {0}  reader(s)".format(details["read_count"]))
+#            logging.info("   Extent currently has  {0}  reader(s)".format(details["read_count"]))
             for i in range(1, int(details["read_count"]) + 1):
-                self._remove_reader(address, extent)
-                logging.info("    {0} readers removed".format(i))
+                log += self._remove_reader(address, extent)
+#                logging.info("    {0} readers removed\n".format(i))
         else:
-            return None
+            return None, log
 
-        return details["read_count"]
+        return details["read_count"], log
 
 
     def Manage(self, address, extent, **kwargs):
@@ -257,17 +257,17 @@ class IBPProtocol(Protocol):
                                                                             )
             result = self._dispatch_command(address["host"], address["port"], tmpCommand)
             if not result:
-                return None
+                return None, ""
             result = result.split(" ")
         except Exception as exp:
-            logging.warn("IBPProtocol.Manage: Could not connect to {host}:{port} - {err}".format(err = exp, **address))
-            return None
+#            logging.warn("IBPProtocol.Manage: Could not connect to {host}:{port} - {err}".format(err = exp, **address))
+            return None, "IBPProtocol.Manage: Could not connect to {host}:{port} - {err}".format(err = exp, **address)
 
         if result[0].startswith("-"):
-            logging.warn("IBPProtocol.Store: Failed to probe allocation - {err}".format(err = print_error(result[0])))
-            return None
+#            logging.warn("IBPProtocol.Store: Failed to probe allocation - {err}".format(err = print_error(result[0])))
+            return None, "IBPProtocol.Store: Failed to probe allocation - {err}".format(err = print_error(result[0]))
         else:
-            return dict(zip(["read_count", "write_count", "size", "max_size", "duration", "reliability", "type"], result[1:]))
+            return dict(zip(["read_count", "write_count", "size", "max_size", "duration", "reliability", "type"], result[1:])), ""
 
         
 
@@ -295,17 +295,15 @@ class IBPProtocol(Protocol):
                                                                             )
             result = self._dispatch_command(address["host"], address["port"], tmpCommand)
             if not result:
-                return None
+                return ""
             result = result.split(" ")
         except Exception as exp:
-            logging.warn("IBPProtocol.Manage: Could not connect to {host}:{port} - {err}".format(err = exp, **address))
-            return None
+            return "IBPProtocol.Manage: Could not connect to {host}:{port} - {err}\n".format(err = exp, **address)
 
         if result[0].startswith("-"):
-            logging.warn("IBPProtocol.Manage: Failed to decrement read cap - {err}".format(err = print_error(result[0])))
-            return None
+            return "IBPProtocol.Manage: Failed to decrement read cap - {err}\n".format(err = print_error(result[0]))
         else:
-            return True
+            return ""
         
 
 
