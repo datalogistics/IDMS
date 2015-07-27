@@ -1,69 +1,87 @@
 
-
 import json
 import tornado
-import logging
 from ws4py.client.tornadoclient import TornadoWebSocketClient
 
-from exnodemanager.policy.policy import Policy
+import exnodemanager.protocol.factory as factory
+import exnodemanager.record as record
 import settings
 
-
 class UNISSocketClient(TornadoWebSocketClient):
-    def initialize(self, policy):
-        self._policy = policy
-        
+    def __init__(self, url):
+        self._log = record.getLogger()
+        super(UNISSocketClient, self).__init__(url)
+
+    def initialize(self, parent):
+        self.parent = parent
         
         
 
 class ExnodeSocketClient(UNISSocketClient):
     def opened(self):
-        logging.info("ExnodeClient.opened: Successfully opened exnode socket to UNIS")
+        self._log.info("ExnodeClient.opened: Successfully opened exnode socket to UNIS")
         
     def received_message(self, message):
-        logging.info("ExnodeClient.received_message: Recieved - {message}".format(message = message))
         try:
             exnode = json.loads(str(message))
-            self._policy.RegisterExnode(exnode)
+            self._log.info("ExnodeClient.received_message: Recieved - {eid}".format(eid = exnode["id"]))
+            if exnode["mode"] == "file":
+                result = self.parent.create_exnode(exnode)
+                self.parent.register_exnode(result)
         except Exception as exp:
-            logging.error("ExnodeClient.received_message: Could not serialize enxnode - {0}".format(exp))
+            self._log.error("ExnodeClient.received_message: Could not serialize enxnode - {0}".format(exp))
     
 class ExtentSocketClient(UNISSocketClient):
     def opened(self):
-        logging.info("ExtentClient.opened: Successfully opened extent socket to UNIS")
+        self._log.info("ExtentClient.opened: Successfully opened extent socket to UNIS")
         
     def received_message(self, message):
-        logging.info("ExtentClient.received_message: Recieved - {message}".format(message = message))
         try:
-            extent = json.loads(str(message))
-            self._policy.RegisterExtent(extent)
+            tmpAlloc = json.loads(str(message))
+            self._log.info("ExtentClient.received_message: Recieved - {eid}".format(eid = tmpAlloc["id"]))
+            self._log.debug("Allocation: {alloc}".format(alloc = tmpAlloc))
+            alloc = factory.buildAllocation(tmpAlloc)
+            if alloc:
+                self.parent.register_allocation(alloc)
+            else:
+                self.parent.remove_allocation(tmpAlloc["id"], tmpAlloc["parent"])
         except Exception as exp:
-            logging.error("ExtentClient.received_message: Could not serialize extent - {0}".format(exp))
+            self._log.error("ExtentClient.received_message: Could not serialize extent - {0}".format(exp))
 
 
 
+            
 def RunUnitTests():
-    pol = Policy()
+    import logging
+    logger = record.getLogger()
+    logger.setLevel(logging.DEBUG)
+    class TestHarness(object):
+        def create_exnode(self, exnode):
+            return None
 
-    logging.basicConfig(level = logging.DEBUG)
+        def register_exnode(self, exnode):
+            pass
+
+        def register_allocation(self, alloc):
+            pass
+
+
+    harness = TestHarness()
 
     # Create websockets to listen for future changes to exnodes and extents
     tmpExnodeUrl = "{protocol}://{host}:{port}/subscribe/{resource}".format(protocol = "ws",
                                                                             host     = settings.UNIS_HOST,
                                                                             port     = settings.UNIS_PORT,
-                                                                            resource = "exnode")
+                                                                            resource = "exnodes")
     tmpExtentUrl = "{protocol}://{host}:{port}/subscribe/{resource}".format(protocol = "ws",
                                                                             host     = settings.UNIS_HOST,
                                                                             port     = settings.UNIS_PORT,
-                                                                            resource = "extent")
+                                                                            resource = "extents")
     
-    print tmpExnodeUrl
-    print tmpExtentUrl
-
     exnode_ws = ExnodeSocketClient(tmpExnodeUrl)
     extent_ws = ExtentSocketClient(tmpExtentUrl)
-    exnode_ws.initialize(policy = pol)
-    extent_ws.initialize(policy = pol)
+    exnode_ws.initialize(parent = harness)
+    extent_ws.initialize(parent = harness)
     exnode_ws.connect()
     extent_ws.connect()
 

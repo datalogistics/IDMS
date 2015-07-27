@@ -10,43 +10,39 @@
 import logging
 import argparse
 import sys
-import urllib2
-import json
 import tornado
 import datetime
 
-from ws4py.client.tornadoclient import TornadoWebSocketClient
 import concurrent.futures
 
 import settings
+import instruction
+import record
 import web.settings as unis_settings
-import policy.refreshpolicy as policy
-import protocol.ibpprotocol as protocol
 import web.unisproxy as db
+
+import protocol.factory as factory
 
 from web.handlers import ExnodeSocketClient, ExtentSocketClient
 
+
 class DispatcherApplication(object):
     def __init__(self):
-        logging.info("__init__: Creating new Dispatcher")
-        self._pending  = []
-        self._policy   = policy.RefreshPolicy()
-        self._protocol = protocol.IBPProtocol()
-        self._db       = db.UnisProxy(unis_settings.UNIS_HOST, unis_settings.UNIS_PORT)
+        # Initialize basic configurations and create the unis proxy which serves as the primary
+        #   data source.  build_policies constructs the requested policies from the settings file.
+        self._log = record.getLogger()
+        self._log.info("__init__: Creating new Dispatcher")
+        self._exnodes     = {}
+        self._db          = db.UnisProxy(unis_settings.UNIS_HOST, unis_settings.UNIS_PORT)
+        self.build_policies()
+        
+        # Register all currently availible exnodes on UNIS to the policy
+        exnodes = self._db.GetExnodes()        
 
-    # Register all currently availible exnodes on UNIS to the policy
-        exnodes = self._db.GetExnodes()
-        for exnode in exnodes:
-            tmpResult = self._policy.RegisterExnode(exnode)
-            logging.info("app.__init__: Registered exnode [{id}]".format(id=tmpResult))
+        with concurrent.futures.ThreadPoolExecutor(max_workers = settings.THREADS) as executor:
+            for result in executor.map(self.create_exnode, exnodes):
+                self.register_exnode(result)
 
-    # Register all currently availible extents on UNIS to the policy
-    # and register their id in the action priority queue
-        extents = self._db.GetExtents()
-        for extent in extents:
-            tmpResult = self._policy.RegisterExtent(extent)
-            if tmpResult:
-                logging.info("app.__init__: Registered extent [{id}]".format(id=tmpResult["id"]))
         
         # Create websockets to listen for future changes to exnodes and extents
         tmpExnodeUrl = "{protocol}://{host}:{port}/subscribe/{resource}".format(protocol = "ws",
@@ -56,129 +52,199 @@ class DispatcherApplication(object):
         tmpExtentUrl = "{protocol}://{host}:{port}/subscribe/{resource}".format(protocol = "ws",
                                                                           host     = unis_settings.UNIS_HOST,
                                                                           port     = unis_settings.UNIS_PORT,
-                                                                          resource = "extent")
+                                                                          resource = "extents")
         
         exnode_ws = ExnodeSocketClient(tmpExnodeUrl)
         extent_ws = ExtentSocketClient(tmpExtentUrl)
-        exnode_ws.initialize(policy = self._policy)
-        extent_ws.initialize(policy = self._policy)
+        exnode_ws.initialize(parent = self)
+        extent_ws.initialize(parent = self)
         exnode_ws.connect()
         extent_ws.connect()
 
+
+        
     def Run(self):
-        logging.info("app.Run: Starting main loop")
-        tornado.ioloop.PeriodicCallback(callback=self._check_extents, callback_time=settings.ITERATION_TIME * 1000).start()
+        self._log.info("app.Run: Starting main loop")
+        tornado.ioloop.PeriodicCallback(callback=self.check_exnodes, callback_time=settings.ITERATION_TIME * 1000).start()
         tornado.ioloop.IOLoop.instance().start()
+    
+    
+
+        
+    def create_exnode(self, exnode):
+        tmpExnode = {}
+        tmpExnode["id"] = exnode["id"]
+        tmpExnode["raw"] = exnode
+        tmpExnode["allocations"] = {}
+        
+        self._log.debug("Creating exnode")
+        with concurrent.futures.ThreadPoolExecutor(max_workers = settings.THREADS) as executor:
+            for alloc, result in zip(exnode["extents"], executor.map(factory.buildAllocation, exnode["extents"])):
+                if result:
+                    self._log.debug("Serialized alloc: {alloc}".format(alloc = result.GetMetadata().Serialize()))
+                    tmpExnode["allocations"][result.GetMetadata().Id] = result
+                else:
+                    self._log.info("app.CreateExnode: Discarding allocation")
+                    self.remove_allocation(alloc["id"], exnode["id"])
+                    
+        return tmpExnode
 
 
-    def _check_extents(self):
-    # Check for pending changes from the policy
-        if self._policy.hasPending():
-            tmpPending = self._policy.GetPendingExtents()
+    
+    def register_exnode(self, exnode):
+        self._exnodes[exnode["id"]] = exnode
+        self._log.info("app.registerExnode: Registered exnode [{id}]".format(id = exnode["id"]))
+        
+        
 
-            for extent in tmpPending:
-                instruction = self._policy.ProcessExtent(extent)
-                if instruction:
-                    self._process_instruction(instruction)
+    def register_allocation(self, alloc):
+        tmpMeta   = alloc.GetMetadata()
+        tmpExnode = self._exnodes[tmpMeta.exnode]
+        tmpId     = tmpMeta.Id
+        now       = datetime.datetime.utcnow()
+                
+        if tmpId in tmpExnode["allocations"]:
+            if alloc > tmpExnode["allocations"][tmpId]:
+                tmpExnode["allocations"][tmpId] = alloc
+        else:
+            tmpExnode["allocations"][tmpId] = alloc
+
+    def remove_allocation(self, alloc, exnode):
+        if exnode in self._exnodes:
+            self._exnodes[exnode]["allocations"].pop(alloc, None)
+            
+
+            
+    def check_exnodes(self):
+        self._log.info("app.Check: Analyzing network and data...")
+        for key, exnode in self._exnodes.items():
+            for policy in self._policies:
+                map(self.process_instruction, policy.GetPendingChanges(exnode))
+    
 
 
-
-    def _process_instruction(self, instruction):
+                
+    def process_instruction(self, command):
+        self._log.debug("Recieved command: {command}".format(command = command))
+        if command["type"] == instruction.MOVE:
+            self._log.info("Moving allocation from {src} to {dest}".format(src = command["allocation"].GetMetadata().getAddress(), dest = command["destination"]))
+            new_alloc = command["allocation"].Move(command["destination"], **command)
+            if new_alloc:
+                self._db.CreateAllocation(new_alloc)
+                self.register_allocation(new_alloc)
+        if command["type"] == instruction.COPY:
+            self._log.info("Copying allocation from {src} to {dest}".format(src = command["allocation"].GetMetadata().getAddress(), dest = command["destination"]))
+            new_alloc = command["allocation"].Copy(command["destination"], **command)
+            if new_alloc:
+                self._db.CreateAllocation(new_alloc)
+                self.register_allocation(new_alloc)
+        if command["type"] == instruction.REFRESH:
+            self._log.info("Refreshing allocation {alloc_id}".format(alloc_id = command["allocation"].GetMetadata().Id))
+            command["allocation"].Manage(duration = command["duration"])
+            self._db.UpdateAllocation(command["allocation"])
+        if command["type"] == instruction.RELEASE:
+            tmpAlloc = command["allocation"]
+            self._log.info("Releasing allocation {alloc_id}".format(alloc_id = tmpAlloc.GetMetadata().Id))
+            command["allocation"].Release()
+            self._db.UpdateAllocation(tmpAlloc)
+    
+    
+    def build_policies(self):
+        tmpPolicies = []
+        
+        for policy in settings.policies:
+            try:
+                self._log.info("Creating policy: {policy}".format(policy = policy["class"]))
+                policy_class = self.get_class(policy["class"])
+                
+                tmpPolicy = policy_class(**policy["args"])
+                for _filter in policy["filters"]:
+                    self._log.info("  Adding filter: {filt}".format(filt = _filter["class"]))
+                    filter_class = self.get_class(_filter["class"])
+                    
+                    tmpFilter = filter_class(**_filter["args"])
+                    tmpPolicy.AddFilter(tmpFilter)
+            
+                tmpPolicies.append(tmpPolicy)
+            except Exception as exp:
+                self._log.warn("app.build_policies: Could not parse policies - {exp}".format(exp = exp))
+        
+        self._policies = tmpPolicies
+    
+    def get_class(self, classname):
         try:
-            extent = instruction["extent"]
-            source = extent["mapping"]["read"].split("/")
-            source = dict(zip(["host", "port"], source[2].split(":")))
-            res_id = extent["id"]
-
-            for destination in instruction["addresses"]:
-                if "duration" in destination:
-                    duration = destination["duration"]
-                else:
-                    duration = None
-
-                # Instruction is a refresh in place
-                if source == destination["address"]:
-                    if self._protocol.Manage(source, extent, duration=duration):
-                        duration = datetime.timedelta(seconds=duration)
-                        newExtent = extent
-                        newExtent["lifetimes"][0]["end"]   = (datetime.datetime.utcnow() + duration).strftime("%Y-%m-%d %H:%M:%S")
-                        if self._db.UpdateExtent(newExtent):
-                            self._policy.ClearExtent(res_id)
-                    else:
-                        logging.warn("app._process_instructions:  Failed to change duration on depot")
-
-                # Instruction is a copy
-                else:
-                    response = self._protocol.Copy(source      = source,
-                                                   destination = destination["address"],
-                                                   extent      = extent,
-                                                   duration    = duration)
-                    if response:
-                        newExtent = { "location": "ibp://", 
-                                      "size":    extent["size"], 
-                                      "offset":  extent["offset"], 
-                                      "parent":  extent["parent"],
-                                      "mapping": response["caps"] }
-
-                        newExtent["lifetimes"][0]["start"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        newExtent["lifetimes"][0]["end"]   = (datetime.datetime.utcnow() + duration).strftime("%Y-%m-%d %H:%M:%S")
-                        if self._db.UpdateExtent(newExtent):
-                            self._policy.ClearExtent(res_id)
-                    else:
-                        logging.warn("app._process_instructions:  Failed to change duration on depot")
-                        
-                        
+            self._log.info("  Importing class: {classname}".format(classname = classname))
+            module, name = classname.rsplit('.', 1)
+            __import__(module)
+            tmpClass = getattr(sys.modules[module], name)
+            self._log.info("  Added {classname}".format(classname = tmpClass))
         except Exception as exp:
-            logging.warn("app._process_instructions: Could not proccess instruction - {message}".format(message = exp))
+            self._log.warn("app.get_class: Invalid class name - {exp}".format(exp = exp))
+            return None
+
+        return tmpClass
 
 
 class PurgeApplication(DispatcherApplication):
     def __init__(self):
-        logging.info("__init__: Creating new Dispatcher")
-        self._policy   = policy.RefreshPolicy()
-        self._protocol = protocol.IBPProtocol()
-        self._db       = db.UnisProxy(unis_settings.UNIS_HOST, unis_settings.UNIS_PORT)
+        self._log = record.getLogger()
+        self._log.info("__init__: Creating new Dispatcher")
+        self._exnodes     = {}
+        self._db          = db.UnisProxy(unis_settings.UNIS_HOST, unis_settings.UNIS_PORT)
 
-    # Register all currently availible exnodes on UNIS to the policy
+        # Register all currently availible exnodes on UNIS to the policy
         exnodes = self._db.GetExnodes()
-        for exnode in exnodes:
-            tmpResult = self._policy.RegisterExnode(exnode)
-
-    # Register all currently availible extents on UNIS to the policy
-    # and register their id in the action priority queue
-        extents = self._db.GetExtents()
-        for extent in extents:
-            tmpResult = self._policy.RegisterExtent(extent, allow_old=True)
-
-    def Run(self):
-        extents = self._policy.extentList()
+        if not exnodes:
+            self._log.error("Could not retrieve exnodes")
+            return
         
         with concurrent.futures.ThreadPoolExecutor(max_workers = settings.THREADS) as executor:
-            for result in executor.map(self.purge_worker, extents):
-                logging.info(result)
+            for result in executor.map(self.create_exnode, exnodes):
+                self._exnodes[result["id"]] = result
+                self._log.info("app.__init__: Registered exnode [{id}]".format(id = result["id"]))
 
 
+
+        allocations = self._db.GetAllocations()
+        if not allocations:
+            self._log.error("Could not retrieve allocations")
+            return
+        
+        with concurrent.futures.ThreadPoolExecutor(max_workers = settings.THREADS) as executor:
+            for result in executor.map(factory.buildAllocation, allocations):
+                if result:
+                    self._exnodes[result.GetMetadata().exnode][result.GetMetadata().Id] = result
+
+
+                
+    def Run(self):
+        with concurrent.futures.ThreadPoolExecutor(max_workers = settings.THREADS) as executor:
+            for result in executor.map(self.purge_worker, self._exnodes.values()):
+                pass
+
+    
     def purge_worker(self, extent):
-        extent = self._policy.extentList()[extent]
-        extent = extent["data"]
-        address = extent["mapping"]["read"].split("/")
-        address = dict(zip(["host", "port"], address[2].split(":")))
-        
-        result, log = self._protocol.Release(address, extent)
-        newExtent = extent
-        newExtent["lifetimes"][0]["end"] = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
-        result, log2 = self._db.UpdateExtent(newExtent)
-        
-        return log + log2
+        with concurrent.futures.ThreadPoolExecutor(max_workers = settings.THREADS) as executor:
+            for result in executor.map(self.purge_allocation, extent["allocations"].values()):
+                pass
 
+
+    def purge_allocation(self, alloc):
+        self._log.info("Releasing {alloc_id}".format(alloc_id = alloc.GetMetadata().Id))
+        alloc.Release()
+        self._db.UpdateAllocation(alloc)
+        return ""
+        
 
 def main():
-# Parse arguments
+    logger = record.getLogger()
+    # Parse arguments
     description = """{prog} collects and manages file information stored in UNIS.
                      Depending on the policy, {prog} will refresh, move, or duplicate
                      data based on network conditions.""".format(prog = sys.argv[0])
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument('-d', '--debug', action='store_true')
+    parser.add_argument('-v', '--verbose', action='store_true')
     parser.add_argument('-l', '--log-file', type=str)
     parser.add_argument('-u', '--unis-host')
     parser.add_argument('-p', '--unis-port', type=int)
@@ -187,9 +253,9 @@ def main():
     do_purge = False
 
     if args.debug:
-        settings.LOG_LEVEL = logging.DEBUG
-    if args.log_file:
-        settings.LOG_PATH = args.log_file
+        logger.setLevel(logging.DEBUG)
+    if args.verbose:
+        logger.setLevel(logging.INFO)
     if args.unis_host:
         unis_settings.UNIS_HOST = args.unis_host
     if args.unis_port:
@@ -198,11 +264,6 @@ def main():
         do_purge = True
 
 # Create and initialize logger
-    if settings.LOG_PATH:
-        logging.basicConfig(filename=settings.LOG_PATH, level=settings.LOG_LEVEL)
-    else:
-        logging.basicConfig(level=settings.LOG_LEVEL)
-    
     if do_purge:
         app = PurgeApplication()
     else:
