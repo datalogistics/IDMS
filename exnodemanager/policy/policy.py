@@ -4,6 +4,7 @@
 class Policy(object):
     def __init__(self):
         self._filters = []
+        self.priority = 0
 
     def GetPendingChanges(self, exnode):
         for _filter in self._filters:
@@ -15,8 +16,7 @@ class Policy(object):
         
     def AddFilter(self, new_filter):
         self._filters.append(new_filter)
-
-
+        
 
     def _apply(self, exnode):
         return []

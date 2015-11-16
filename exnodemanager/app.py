@@ -124,7 +124,7 @@ class DispatcherApplication(object):
 
 
                 
-    def process_instruction(self, command):
+    def process_instructions(self, command):
         self._log.debug("Recieved command: {command}".format(command = command))
         if command["type"] == instruction.MOVE:
             self._log.info("Moving allocation from {src} to {dest}".format(src = command["allocation"].GetMetadata().getAddress(), dest = command["destination"]))
@@ -158,6 +158,9 @@ class DispatcherApplication(object):
                 policy_class = self.get_class(policy["class"])
                 
                 tmpPolicy = policy_class(**policy["args"])
+                if "priority" in policy:
+                    tmpPolicy.priority = priority
+                    
                 for _filter in policy["filters"]:
                     self._log.info("  Adding filter: {filt}".format(filt = _filter["class"]))
                     filter_class = self.get_class(_filter["class"])

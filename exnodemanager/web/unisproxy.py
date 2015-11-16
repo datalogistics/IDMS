@@ -1,7 +1,7 @@
 import json
 import requests
 
-import settings as settings
+import exnodemanager.web.settings as settings
 import exnodemanager.record as record
 
 class UnisProxy(object):
@@ -97,13 +97,13 @@ def RunUnitTests():
     exnodes = proxy.GetExnodes()
     
     assert exnodes
-    print len(exnodes)
+    print(len(exnodes))
     
     # Get Extents
     allocations = proxy.GetAllocations()
     
     assert allocations
-    print len(allocations)
+    print(len(allocations))
 
     # Change Extent
 #    newExtent = allocations[0]

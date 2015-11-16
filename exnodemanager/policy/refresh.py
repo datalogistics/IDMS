@@ -8,13 +8,16 @@ from policy import Policy
 
 
 class Refresh(Policy):
-    def __init__(self, keepfor, refreshperiod):
+    def __init__(self, keepfor, refreshperiod, refreshat = None, **kwargs):
         self._log = record.getLogger()
         self._keepfor = datetime.timedelta(minutes = keepfor)
         self._refreshPeriod = datetime.timedelta(minutes = refreshperiod)
-        self._refreshAt     = datetime.timedelta(minutes = refreshperiod / 2)
+        if refreshat:
+            self._refreshAt = datetime.timedelta(minutes = refreshat)
+        else:
+            self._refreshAt = datetime.timedelta(minutes = refreshperiod / 2)
         super(Refresh, self).__init__()
-
+        
     def _apply(self, exnode):
         self._log.info("Refreshing: {exnode}".format(exnode = exnode["raw"]["id"]))
         commands = []

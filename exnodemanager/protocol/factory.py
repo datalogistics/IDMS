@@ -1,7 +1,7 @@
 
 import json
 
-import ibp.factory
+import exnodemanager.protocol.ibp.factory as factory
 import exnodemanager.record as record
 
 def buildAllocation(json):
@@ -14,4 +14,4 @@ def buildAllocation(json):
     
     # TODO: Implement allocation types
     # if json["type"] == "ibp":
-    return ibp.factory.buildAllocation(json)
+    return factory.buildAllocation(json)

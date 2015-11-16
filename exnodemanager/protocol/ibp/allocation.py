@@ -19,7 +19,7 @@ import exnodemanager.record as record
 class Allocation(object):
     def __init__(self, alloc = None):
         self._log = record.getLogger()
-
+        
         self.allocationType = "ibp"
         self.Id          = ""
         self.realSize    = 0
@@ -35,23 +35,24 @@ class Allocation(object):
         
         if alloc:
             self.Deserialize(alloc)
-
-
-
+            
+            
+            
     def getAddress(self):
         return "{host}:{port}".format(host = self.host, port = self.port)
 
-    def Inherit(self, alloc):
-        self.SetReadCapability(str(alloc._read))
-        self.SetWriteCapability(str(alloc._write))
-        self.SetManageCapability(str(alloc._manage))
-        self.depotSize   = alloc.depotSize
-        self.depotOffset = alloc.depotOffset
-        self.start       = alloc.start
-        self.end         = alloc.end
-        self.exnode      = alloc.exnode
+    def Clone(self):
+        tmpAlloc = Allocation()
+        tmpAlloc.realSize    = self.realSize
+        tmpAlloc.offset      = self.offset
+        tmpAlloc.depotSize   = self.depotSize
+        tmpAlloc.depotOffset = self.depotOffset
+        tmpAlloc.start       = self.start
+        tmpAlloc.end         = self.end
+        tmpAlloc.exnode      = self.exnode
         
-                
+        return tmpAlloc
+    
     def Deserialize(self, alloc):
         try:
             self.Id          = alloc["id"]

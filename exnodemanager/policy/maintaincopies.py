@@ -4,65 +4,66 @@ from collections import deque
 import exnodemanager.instruction as instruction
 import exnodemanager.protocol.ibp as ibp
 import exnodemanager.record as record
+import exnodemanager.web.unisproxy as db
+import exnodemanager.web.settings as unis_settings
 
 from policy import Policy
 
-
 class MaintainCopies(Policy):
-    def __init__(self, copies):
+    def __init__(self, copies, copyduration = 60, validate = True, **kwargs):
+        super(MaintainCopies, self).__init__()
         self._log = record.getLogger()
         self._copies = copies
-        self._depotList = set()
-        super(MaintainCopies, self).__init__()
-    
+        self._validate = validate
+        if not "depots" in kwargs:
+            conn = db.UnisProxy(unis_settings.UNIS_HOST, unis_settings.UNIS_PORT)
+            self._depots = deque(conn.GetDepots())
+        else:
+            self._depots = deque(kwargs["depots"])
+        self._duration = copyduration
+        
     def _apply(self, exnode):
         instructions = []
-        tmpCopies = [ Record() for x in range(self._copies) ]
-        tmpHoles  = []
-        tmpExtraAllocs = []
+        seen = []
+        tmpExnodes = exnode["allocations"]
         
-        self._log.info("!Maintain {copies} copies of {exnode}".format(copies = self._copies, exnode = exnode["raw"]["id"]))
-        for key, alloc in exnode["allocations"].items():
-            if not alloc.Check():
-                instructions.append({ "type": instruction.RELEASE, "allocation": alloc })
+        for check_id, check_alloc in tmpExnodes.items():
+            count = 0
+            found = []
+            checkMeta = check_alloc.GetMetadata()
+            if (checkMeta.realSize, checkMeta.offset) in seen:
                 continue
-
-            tmpAlloc = alloc.GetMetadata()
-            self._depotList.add((tmpAlloc.host, tmpAlloc.port))
+            else:
+                seen.append((checkMeta.realSize, checkMeta.offset))
             
-            success = False
-            for i in range(self._copies):
-                if tmpCopies[i].Add(alloc):
-                    success = True
-                    break
+            for inner_id, alloc in tmpExnodes.items():
+                meta      = alloc.GetMetadata()
                 
-            if not success:
-                tmpExtraAllocs.append(alloc)
+                if checkMeta.offset == meta.offset and checkMeta.realSize == meta.realSize:
+                    count += 1
+                    found.append(alloc)
+            
 
-        
-        size = exnode["raw"]["size"]
-        depots = deque(self._depotList)
-
-        for record in tmpCopies:
-            tmpHoles += record.FindHoles(size)
-
-        for hole in tmpHoles:
-            for key, alloc in exnode["allocations"].items():
-                tmpAlloc = alloc.GetMetadata()
-                if tmpAlloc.offset <= hole["start"] and tmpAlloc.offset + tmpAlloc.realSize >= hole["end"]:
-                    depot = depots.popleft()
-                    depots.append(depot)
-
-                    while not ibp.services.GetStatus({"host": depot[0], "port": depot[1]}):
-                        depot = depots.popleft()
-                        depots.append(depot)
-                    
-                    instructions.append({ "type": instruction.COPY, "allocation": alloc, "destination": {"host": depot[0], "port": depot[1]} })
-                    break
-
-        for extra in tmpExtraAllocs:
-            instructions.append({ "type": instruction.RELEASE, "allocation": alloc })
-        
+            if len(found) > self._copies:
+                ordered_found = sorted(found, key = lambda alloc: alloc.GetMetadata().timestamp, reverse = True)
+                for i in range(self._copies, len(found)):
+                    instructions.append({ "type": instruction.RELEASE, "allocation": ordered_found[i] })
+            else:
+                for i in range(len(found), self._copies):
+                    searching = True
+                    while searching:
+                        tmpDepot = self._depots.popleft()
+                        self._depots.append(tmpDepot)
+                        duplicate = False
+                        for alloc in found:
+                            if alloc.GetMetadata().host == tmpDepot[0]:
+                                duplication = True
+                                break
+                        if not duplicate:
+                            searching = False
+                      
+                    instructions.append({ "type": instruction.COPY, "allocation": check_alloc, "destination": {"host": tmpDepot[0], "port": tmpDepot[1]} })
+                
         return instructions
 
 

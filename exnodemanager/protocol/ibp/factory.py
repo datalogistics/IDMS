@@ -1,11 +1,11 @@
 
 import json
 import datetime
-import flags
 
 from exnodemanager.protocol.exceptions import AllocationException
 from exnodemanager.protocol.ibp.allocation import Allocation
 import exnodemanager.protocol.ibp.services as services
+import exnodemanager.protocol.ibp.flags as flags
 import exnodemanager.record as record
 
 def buildAllocation(json):
@@ -15,16 +15,17 @@ def buildAllocation(json):
         except Exception as exp:
             record.getLogger().warn("{func:>20}| Could not decode allocation - {exp}".format(func = "buildAllocation", exp = exp))
             raise AllocationException("Could not decode json")
-    
-    alloc = Allocation(json)
-    tmpAdapter = IBPAdaptor(alloc)
 
-    try:
-        tmpAdapter.Check()
-    except AllocationException as exp:
-        tmpAdapter = None
-    finally:
-        return tmpAdapter
+    if type(json) is dict:
+        alloc = Allocation(json)
+    elif type(json) is Allocation:
+        alloc = json
+    else:
+        raise AllocationException("Invalid input type")
+            
+    tmpAdapter = IBPAdaptor(alloc)
+    
+    return tmpAdapter
 
 
 class IBPAdaptor(object):
@@ -68,7 +69,7 @@ class IBPAdaptor(object):
         if not response:
             return False
         
-        dest_alloc.Inherit(response)
+        dest_alloc._allocation.Inherit(response)
         dest_alloc.offset = offset
         duration = self._service.Send(self._allocation, alloc, **kwargs)
         
@@ -140,4 +141,3 @@ class IBPAdaptor(object):
                 return 1
         else:
             raise TypeError("Cannot compare {t1} and {t2}".format(t1 = type(self), t2 = type(other)))
-            
