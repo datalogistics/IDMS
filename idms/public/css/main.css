@@ -1,0 +1,62 @@
+.idms_drag {
+    border: 5px dashed black !important;
+    border-radius: 5px;
+}
+
+.idms_drag div {
+    visibility: hidden;
+}
+
+.idms_draggable * {
+    pointer-events: none;
+}
+
+.idms_freeze {
+    pointer-events: none;
+}
+
+.idms_thaw {
+    pointer-events: auto;
+}
+
+.idms_predicate {
+    min-height: 30px;
+    min-width: 200px;
+}
+
+.idms_list {
+    border-left: 1px solid black;
+}
+
+.hidebutton {
+    cursor: pointer;
+}
+
+.template {
+    display: none;
+}
+
+.idmswarn {
+    background-color: #f2711c!important;
+}
+
+.idmswarn::placeholder {
+    color: #c24100;
+}
+
+.item {
+    cursor: grab;
+}
+
+.placeholder {
+    cursor: default;
+}
+
+.inputfile {
+    width: 0.1px;
+    height: 0.1px;
+    opacity: 0;
+    overflow: hidden;
+    position: absolute;
+    z-index: -1;
+}

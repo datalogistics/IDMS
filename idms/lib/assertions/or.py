@@ -1,10 +1,15 @@
+import typing
+
 from idms.lib import assertions
 from idms.lib.assertions.abstract import AbstractAssertion
 from idms.lib.assertions.exceptions import SatisfactionError
 
 class Disjunction(AbstractAssertion):
+    """
+    Ensures one of several policies holds (in order of appearance)
+    """
     tag = "$or"
-    def initialize(self, policies):
+    def initialize(self, policies:typing.List[AbstractAssertion]):
         self._ls = [assertions.factory(p) for p in policies]
 
     def apply(self, exnode, runtime):

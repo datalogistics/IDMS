@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <link rel="shortcut icon" href="s/img/favicon.png">
+    <link rel="stylesheet" type="text/css" href="s/css/main.css">
+    <link rel="stylesheet" type="text/css" href="s/semantic/semantic.min.css">
+    <script src="s/js/jquery-3.4.1.min.js"></script>
+    <script src="s/semantic/semantic.min.js"></script>
+    <script src="s/js/manager.js"></script>
+    <script type="text/javascript" src="s/js/droparea.js"></script>
+  </head>
+  <body>
+    <div class="ui mini modal folder">
+      <div class="header">Create Folder</div>
+      <div class="content">
+	<div class="ui input">
+	  <input type="text" id="newfoldername" placeholder="Folder name">
+	</div>
+      </div>
+      <div class="actions">
+	<div class="ui basic cancel button">
+	  <i class="remove icon"></i>Cancel
+	</div>
+	<div class="ui blue approve button">
+	  <i class="checkmark icon"></i>Confirm
+	</div>
+      </div>
+    </div>
+    <div class="ui basic modal warning">
+      <div class="header">Warning</div>
+      <div class="content" id="modalmsg"></div>
+      <div class="actions">
+	<div class="ui orange basic cancel inverted button">
+	  <i class="remove icon"></i>Confirm
+	</div>
+      </div>
+    </div>
+    <div class="ui horizontal segments">
+      <div class="ui list" id="toolbox">
+	<div class="ui segment" style="background-color: #f0f0f0">
+	  <label class="ui top attached label">Toolbox</label>
+	  <div class="ui item">
+	    <div class="ui basic segment">
+	      <label class="ui red right ribbon label">Policies</label>
+	      <div style="padding-top: 5px" id="toolbox-policies"></div>
+	    </div>
+	  </div>
+	  <!--div class="ui item">
+	    <div class="ui basic segment">
+	      <label class="ui red right ribbon label">Depots</label>
+	      <div style="padding-top: 5px" id="toolbox-depots"></div>
+	    </div>
+	  </div-->
+	  <div class="ui item">
+	    <div class="ui basic segment">
+	      <label class="ui red right ribbon label">Matches</label>
+	      <div style="padding-top: 5px">
+		<div class="idms_match" draggable="true" data-type="match" title="Apply policy when a property is true">
+		  <div class="item">
+		    <div class="ui secondary raised segment"><div class="ui tiny header">Property</div></div>
+		  </div>
+		  <div class="template">
+		    <div class="ui horizontal segments predicate" data-type="pred">
+		      <div class="segment">
+			<div class="ui mini input">
+			  <input type="text" class="property" placeholder="attribute">
+			</div>
+		      </div>
+		      <div class="segment">
+			<select style="font-size: 0.79em">
+			  <option value="$eq">=</option>
+			  <option value="$gt">&gt;</option>
+			  <option value="$gte">&gt;=</option>
+			  <option value="$lt">&lt;</option>
+			  <option value="$lte">&lt;=</option>
+			  <option value="$regex">regex</option>
+			</select>
+		      </div>
+		      <div class="segment">
+			<div class="ui mini input">
+			  <input type="text" class="value" placeholder="value">
+			</div>
+		      </div>
+		    </div>
+		  </div>
+		</div>
+		<div class="idms_match" draggable="true" data-type="match" title="Apply policy when all conditions are met">
+		  <div class="item">
+		    <div class="ui secondary raised segment"><div class="ui tiny header">And</div></div>
+		  </div>
+	          <div class="template">
+		    <div class="ui basic segment">
+		      <div class="ui medium header hidebutton">And</div>
+		      <div class="hideable">
+			<div class="idms_list predicate" data-type="$and">
+			  <div class="template">
+			    <div class="ui placeholder segment" style="min-height: 150px; width: 300px;">
+			      <div class="ui one column grid">
+				<div class="middle aligned row">
+				  <div class="column">
+				    <div class="ui center aligned icon header">
+				      <i class="code icon"></i>Drag Policy type from left
+				    </div>
+				  </div>
+				</div>
+			      </div>
+			    </div>
+			  </div>
+			</div>
+	              </div>
+	            </div>
+		  </div>
+		</div>
+		<div class="idms_match" draggable="true" data-type="match" title="Apply policy in any of several possible conditions">
+		  <div class="item">
+		    <div class="ui secondary raised segment"><div class="ui tiny header">Or</div></div>
+		  </div>
+	          <div class="template">
+		    <div class="ui basic segment">
+		      <div class="ui medium header hidebutton">Or</div>
+		      <div class="hideable">
+			<div class="idms_list predicate" data-type="$or">
+			  <div class="template">
+			    <div class="ui placeholder segment" style="min-height: 150px; width: 300px;">
+			      <div class="ui one column grid">
+				<div class="middle aligned row">
+				  <div class="column">
+				    <div class="ui center aligned icon header">
+				      <i class="code icon"></i>Drag Policy type from left
+				    </div>
+				  </div>
+				</div>
+			      </div>
+			    </div>
+			  </div>
+			</div>
+	              </div>
+	            </div>
+		  </div>
+		</div>
+	      </div>
+	    </div>
+	  </div>
+	</div>
+      </div>
+      <div class="ui basic segment">
+	<div id="pending">
+	  <span class="ui large header">Pending Policy</span>
+	  <div id="pending-box-outer" style="padding: 10px 5px;">
+	    <div id="pending-box">
+	      <div class="template">
+		<div class="ui placeholder segment">
+		  <div class="ui one column grid">
+		    <div class="middle aligned row">
+		      <div class="column">
+			<div class="ui center aligned icon header">
+			  <i class="code icon"></i>Drag Policy from left to create new policy
+			</div>
+		      </div>
+		    </div>
+		  </div>
+		</div>
+	      </div>
+	    </div>
+	  </div>
+	</div>
+	<span class="ui large header">Active Policies</span>
+	<div class="ui relaxed divided list" id="activelist"></div>
+      </div>
+      <div class="ui list">
+	<div class="ui simple basic segment">
+	  <div class="ui segment" style="background-color: #f0f0f0; min-width: 250px">
+	    <label class="ui top attached label">File Browser</label>
+	    <div id="idms_files" data-id="">
+	      <div class="template">
+		<div class="ui placeholder segment idms_draggable" data-parent="" style="min-height: 50px;">
+		  <div class="ui one column center aligned grid">
+		    <div class="middle aligned row">
+		      <div class="centered column">
+			<div id="filedrop">
+			  <i class="huge file icon"></i><b>Drag files</b> here<p style="margin: 10px">OR</p>
+			</div>
+			<div class="ui buttons" style="margin: 10px">
+			  <div id="manualupload">
+			    <input type="file" class="inputfile" id="uploadbutton" multiple>
+			    <label for="uploadbutton" class="ui blue button idms_thaw">
+			      <i class="ui upload icon"></i>Upload Files
+			    </label>
+			  </div>
+			  <div class="ui blue button idms_thaw" id="addfolder" style="margin-left: 5px">Add Folder</div>
+			</div>
+		      </div>
+		    </div>
+		  </div>
+		</div>
+	      </div>
+	    </div>
+	    <div class="ui list" id="filelist"></div>
+	  </div>
+	  <div class="ui active dimmer" id="filebrowser">
+	    <div class="ui text loader">Syncing Files</div>
+	  </div>
+	</div>
+      </div>
+    </div>
+  </body>
+</html>

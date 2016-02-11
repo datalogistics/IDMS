@@ -1,4 +1,4 @@
-import re, enum, logging, copy
+import re, enum, logging, copy, uuid
 
 from collections import namedtuple
 from unis.models import Exnode, Service
@@ -19,6 +19,7 @@ class Policy(object):
         self.verb = assertions.factory(verb)
         self._watch, self._lock = set(), Lock()
         self._broken, self.status = [], Status.INACTIVE
+        self.uid = uuid.uuid4()
 
     def apply(self, db):
         with self._lock: watch = copy.copy(self._watch)
@@ -68,9 +69,12 @@ class Policy(object):
         def _lte(n,v):
             test = getattr(exnode, n, None)
             return test is not None and test <= v
+        def _eq(n,v):
+            test = getattr(exnode, n, None)
+            return test is not None and test == v
         def _comp(v, ctx):
             lmap = {"$or": _or, "$and": _and, "$not": _not}
-            cmap = {"$regex": _regex, "$in": _in, "$gt": _gt, "$lt": _lt, "$gte": _gte, "$lte": _lte}
+            cmap = {"$regex": _regex, "$in": _in, "$gt": _gt, "$lt": _lt, "$gte": _gte, "$lte": _lte, "$eq": _eq}
             result = True
             for n,v in v.items():
                 fn = lmap.get(n, cmap.get(n, None))
@@ -87,4 +91,6 @@ class Policy(object):
         return _comp(self.desc, None)
     def to_JSON(self):
         return {"description": self.desc,
-                "policy": self.verb.to_JSON()}
+                "policy": self.verb.to_JSON(),
+                "status": self.status.name,
+                "id": str(self.uid)}

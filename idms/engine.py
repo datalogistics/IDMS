@@ -4,11 +4,11 @@ from time import sleep
 
 from idms.settings import ENGINE_LOOP_DELAY
 
-def run(db):
+def run(db, delay):
     log = logging.getLogger("idms.engine")
     def _loop():
         while True:
-            sleep(ENGINE_LOOP_DELAY)
+            sleep(delay)
             try:
                 [p.apply(db) for p in db.get_active_policies()]
                 if list(db.get_active_policies()):
@@ -16,6 +16,8 @@ def run(db):
                     _print_status([p.status for p in db.get_active_policies()])
                     log.debug(stats)
             except Exception as exp:
+                import traceback
+                traceback.print_exc()
                 log.warn("Failure during policy application - {}".format(exp))
 
     runner = Thread(target=_loop, name="idms_engine", daemon=True)

@@ -5,7 +5,6 @@ import hmac
 import json
 import time
 
-from idms import settings
 from idms.handlers.base import _BaseHandler
 from idms.handlers.utils import get_body
 
@@ -19,7 +18,7 @@ class AuthHandler(_BaseHandler):
         header = { "alg": "HS256", "typ": "JWT" }
         payload = { 
             "iss": auth[0],
-            "exp": int(time.time()) + settings.TOKEN_TTL,
+            "exp": int(time.time()) + self._conf['auth']['tokenttl'],
             "prv": ",".join(self._db.get_usr(auth[0], auth[1]))
         }
         tok = self._generate_token(header, payload)
@@ -31,5 +30,5 @@ class AuthHandler(_BaseHandler):
         b_header = base64.urlsafe_b64encode(json.dumps(header).encode('utf-8'))
         b_payload = base64.urlsafe_b64encode(json.dumps(payload).encode('utf-8'))
         itok = ".".join([b_header.decode('utf-8'), b_payload.decode('utf-8')])
-        sig = hmac.new(self._conf.get('secret', "there is no secret").encode('utf-8'), itok.encode('utf-8'), digestmod=hashlib.sha256).digest()
+        sig = hmac.new(self._conf['auth'].get('secret', "there is no secret").encode('utf-8'), itok.encode('utf-8'), digestmod=hashlib.sha256).digest()
         return ".".join([itok, base64.urlsafe_b64encode(sig).decode('utf-8')])

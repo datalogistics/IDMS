@@ -1,12 +1,28 @@
-import falcon
-import json
-import requests
+import falcon, json, requests, typing, inspect
 
 from idms.handlers.base import _BaseHandler
 from idms.handlers.utils import get_body
 from idms.lib.policy import Policy
+from idms.lib.assertions import assertions, AbstractAssertion
 
 class PolicyHandler(_BaseHandler):
+    types = {int: 'int', float: 'float', str: 'str', list: 'strlist',
+             typing.List[AbstractAssertion]: 'policylist',
+             typing.List[int]: 'numlist',
+             typing.List[float]: 'numlist', typing.List[str]: 'strlist'}
+    @falcon.after(_BaseHandler.encode_response)
+    def on_get(self, req, resp):
+        results = {}
+        for tag, policy in assertions.items():
+            args, sig = {}, inspect.signature(policy.initialize)
+            for k,v in list(sig.parameters.items())[1:]:
+                args[k] = { 'type': self.types.get(v.annotation, 'str'),
+                            'default': v.default if v.default is not inspect._empty else '' }
+            results[tag] = { 'args': args, 'description': policy.__doc__ or "" }
+
+        resp.body = results
+        resp.status = falcon.HTTP_200
+    
     #@falcon.before(_BaseHandler.do_auth)
     @falcon.after(_BaseHandler.encode_response)
     @get_body

@@ -1,13 +1,12 @@
-import argparse
+import argparse, importlib
 import falcon
 import json
 import time
 import logging as plogging
 from lace.logging import trace
 
-
-from idms import engine
-from idms.handlers import PolicyHandler, PolicyTracker, SSLCheck, DepotHandler, BuiltinHandler
+from idms import engine, settings
+from idms.handlers import PolicyHandler, PolicyTracker, SSLCheck, DepotHandler, BuiltinHandler, StaticHandler, FileHandler, DirHandler
 from idms.lib.db import DBLayer
 from idms.lib.middleware import FalconCORS
 from idms.lib.service import IDMSService
@@ -20,15 +19,24 @@ from unis.exceptions import ConnectionError
 from unis.rest import UnisClient
 
 routes = {
-    "p": {"handler": BuiltinHandler},
+    "f": {"handler": FileHandler},
+    "dir": {"handler": DirHandler},
+    "p": {"handler": BuiltinHandler}, # DEFUNCT
     "r": {"handler": PolicyHandler},
     "a": {"handler": PolicyTracker},
     "a/{exnode}": {"handler": PolicyTracker},
-    "d/{ref}": {"handler": DepotHandler}
+    "d/{ref}": {"handler": DepotHandler},
+    "manage": {"handler": StaticHandler},
+    "s/{ty}/{filename}": {"handler": StaticHandler}
 }
 
-def _get_app(unis, depots, viz):
-    conf = {"auth": False, "secret": "a4534asdfsberwregoifgjh948u12"}
+def get_app(conf):
+    unis = [str(u) for u in conf['general']['dburl'].split(',')]
+    depots = None
+    if conf['general']['depotfile']:
+        with open(conf['general']['depotfile']) as f:
+            depots = json.load(f)
+
     while True:
         try:
             rt = Runtime(unis, defer_update=True, preload=["nodes", "services"])
@@ -40,9 +48,19 @@ def _get_app(unis, depots, viz):
         break
 
     master = UnisClient.resolve(unis[0])
-    db = DBLayer(rt, depots, viz)
-    engine.run(db)
-    service = IDMSService(db, master)
+    db = DBLayer(rt, depots, conf)
+    for plugin in conf['general']['plugins']:
+        path = plugin.split('.')
+        try:
+            module = importlib.import_module('.'.join(path[:-1]))
+            cls = getattr(module, path[-1])
+            db.add_post_process(cls(db, conf))
+        except (ImportError, AttributeError):
+            import traceback
+            traceback.print_exc()
+            logging.getLogger('idms').warn("Bad postprocessing module - {}".format(plugin))
+    engine.run(db, conf['general']['loopdelay'])
+    service = IDMSService(db, UnisClient.resolve(unis[0]))
     rt.addService(service)
     
     ensure_ssl = SSLCheck(conf)
@@ -54,40 +72,44 @@ def _get_app(unis, depots, viz):
     
     return app
 
-def main():
-    parser = argparse.ArgumentParser(description='')
-    parser.add_argument('-u', '--unis', default='http://wdln-base-station:8888', type=str,
-                        help='Set the comma diliminated urls to the unis instances of interest')
-    parser.add_argument('-H', '--host', type=str, help='Set the host for the server')
-    parser.add_argument('-p', '--port', default=8000, type=int, help='Set the port for the server')
-    parser.add_argument('-d', '--debug', default="NONE", type=str, help='Set the log level')
-    parser.add_argument('-D', '--depots', default='', type=str, help='Provide a file for the depot decriptions')
-    parser.add_argument('-v', '--visualize', default='', type=str, help='Set the server for the visualization effects')
-    parser.add_argument('-q', '--viz_port', default='42424', type=str, help='Set the port fo the visualization effects')
-    args = parser.parse_args()
-    
+def setup_logging(level):
     plogging.basicConfig(format='%(color)s[%(asctime)-15s] [%(levelname)s] %(name)s%(reset)s %(message)s')
-    level = {"NONE": logging.NOTSET, "INFO": logging.INFO, "DEBUG": logging.DEBUG, "TRACE": logging.TRACE_ALL}[args.debug]
+    level = {"NONE": logging.NOTSET, "INFO": logging.INFO, "DEBUG": logging.DEBUG, "TRACE": logging.TRACE_ALL}[level]
     log = logging.getLogger("idms")
     logging.getLogger('libdlt').setLevel(level)
     logging.getLogger('unis').setLevel(level)
     trace.showCallDepth(True)
     log.setLevel(level)
-    host, port = args.host if args.host else "0.0.0.0", args.port
-    unis = [str(u) for u in args.unis.split(',')]
-    depots = None
-    if args.depots:
-        with open(args.depots) as f:
-            depots = json.load(f)
-    viz = "{}:{}".format(args.visualize, args.viz_port) if args.visualize else None
-    app = _get_app(unis, depots, viz)
+    return log
+
+conf = settings.CONFIG
+def main():
+    parser = argparse.ArgumentParser(description='')
+    parser.add_argument('-u', '--unis', type=str,
+                        help='Set the comma diliminated urls to the unis instances of interest')
+    parser.add_argument('-H', '--host', type=str, help='Set the host for the server')
+    parser.add_argument('-p', '--port', default=8000, type=int, help='Set the port for the server')
+    parser.add_argument('-d', '--debug', type=str, help='Set the log level')
+    parser.add_argument('-D', '--depots', type=str, help='Provide a file for the depot decriptions')
+    parser.add_argument('-v', '--visualize', type=str, help='Set the server for the visualization effects')
+    parser.add_argument('-S', '--staging', type=str, help="Set the accessPoint URL for the depot to stage new data")
+    parser.add_argument('-q', '--viz_port', default='42424', type=str, help='Set the port fo the visualization effects')
+    args = parser.parse_args()
+    conf['general'].update(**{
+        'dburl': args.unis or conf['general']['dburl'],
+        'loglevel': args.debug or conf['general']['loglevel'],
+        'depotfile': args.depots or conf['general']['depotfile'],
+        'vizurl': "{}:{}".format(args.visualize, args.viz_port) if args.visualize else conf['general']['vizurl']
+    })
+    conf['upload']['staging'] = args.staging or conf['upload']['staging']
     
+    log = setup_logging(conf['general']['loglevel'])
+    app = get_app(conf)
+    log.info("Fetching topology from {}".format(conf['general']['dburl']))
+
     from wsgiref.simple_server import make_server
+    host, port = args.host if args.host else "0.0.0.0", args.port
     server = make_server(host, port, app)
     port = "" if port == 80 else port
-    print("Getting topology from {}".format(unis))
-    print("Listening on {}{}{}".format(host,":" if port else "", port))
+    log.info("Listening on {}{}{}".format(host,":" if port else "", port))
     server.serve_forever()
-    
-if __name__ == "__main__":
-    main()

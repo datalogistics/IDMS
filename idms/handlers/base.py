@@ -15,7 +15,7 @@ class _BaseHandler(object):
     
     @classmethod
     def do_auth(self, req, resp, resource, params):
-        if resource._conf.get('auth', False):
+        if resource._conf['auth'].get('auth', False):
             if not req.auth:
                 raise falcon.HTTPMissingHeader("Missing OAuth token", "Authorization")
             
@@ -29,7 +29,7 @@ class _BaseHandler(object):
             if len(parts) != 3:
                 raise falcon.HTTPUnauthorized("Token is not a valid JWT token")
             itok = ".".join(parts[:2])
-            sig = hmac.new(resource._conf.get('secret', "there is no secret").encode('utf-8'), itok.encode('utf-8'), digestmod=hashlib.sha256).digest()
+            sig = hmac.new(resource._conf['auth'].get('secret', "there is no secret").encode('utf-8'), itok.encode('utf-8'), digestmod=hashlib.sha256).digest()
             if not hmac.compare_digest(base64.urlsafe_b64encode(sig), parts[2].encode('utf-8')):
                 raise falcon.HTTPForbidden()
                 

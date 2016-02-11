@@ -11,6 +11,10 @@ class AbstractAssertion(object):
     @property
     def tag(self):
         raise NotImplementedError()
+
+    @property
+    def expects(self):
+        raise NotImplementedError()
     
     def apply(self, exnode, db):
         """

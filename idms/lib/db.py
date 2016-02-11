@@ -13,21 +13,21 @@ from unis import Runtime
 from unis.models import Exnode
 from unis.rest import UnisClient
 
-from idms import settings
 from idms.lib.thread import ThreadManager
-from idms.lib.assertions.exceptions import SatisfactionError
 
 log = logging.getLogger('idms.db')
 @trace("idms.db")
 class DBLayer(object):
-    def __init__(self, runtime, depots, viz):
-        self._rt, self._depots, self._viz = runtime, (depots or {}), viz 
-        self._workers, self._proxy = ThreadManager(), IBPManager()
+    def __init__(self, runtime, depots, conf):
+        self._servicetypes = conf['general']['servicetypes']
+        self._rt, self._depots, self._viz = runtime, (depots or {}), conf['general']['vizurl']
+        self._workers = ThreadManager(conf['threads']['initialsize'], conf['threads']['max'])
+        self._proxy = IBPManager()
         self._local_files, self._active = [], []
         self._lock, self._flock, self._enroute = RLock(), RLock(), set()
+        self._plugins = []
 
     def _viz_register(self, name, size):
-        print(self._viz)
         if self._viz:
             try:
                 uid, o = uuid.uuid4().hex, urisplit(self._viz)
@@ -50,84 +50,52 @@ class DBLayer(object):
                 sock[1].emit('peri_download_pushdata', msg)
             except Exception as e: pass
 
-    def move_files(self, exnode, dst=None, ttl=None):
-        log.info("Moving {}->{}".format(exnode.id, dst.name))
-        def _job(exnode, dst, ttl):
-            def valid(x):
-                if not hasattr(x, 'depot'): x.depot = Depot(x.location)
-                try: return self._proxy.probe(x)
-                except Exception as e:
-                    log.warn("Failed to connect with allocation - " + x.location)
-                    return False
+    def add_post_process(self, cb):
+        self._plugins.append(cb)
 
-            remote = None
+    def move_allocs(self, allocs, dst=None, ttl=None, skip_pp=False):
+        log.info("Moving [{}] {}->{}".format(allocs[0].parent.id, ",".join([str(a.offset) for a in allocs]), dst.name))
+        def _job(allocs, dst, ttl):
+            socks = {}
             try:
-                dst = self._rt.services.where({'accessPoint': dst}) if isinstance(dst, str) else dst
-                self._rt.addSources([{'url': dst.unis_url, 'enabled': True}])
-                try: UnisClient.get_uuid(dst.unis_url)
-                except: raise SatisfactionError("Failed to connect to remote")
-                remote = self._rt.exnodes.first_where({'replica_of': exnode, 'service': dst})
-                if not remote:
-                    remote = exnode.clone()
-                    remote.extents = []
-                    remote.extendSchema('replica_of', exnode)
-                    remote.extendSchema('service', dst)
-                    self._rt.insert(remote, commit=True, publish_to=dst.unis_url)
-
-                sock = self._viz_register(exnode.name, exnode.size)
-                log.debug("--Creating allocation list")
-                chunks = list(sorted([x for x in exnode.extents.where(valid)], key=lambda x: x.offset))
-                ready = list(sorted([x for x in remote.extents.where(valid)], key=lambda x: x.offset))
+                for a in allocs:
+                    p = a.parent
+                    if p not in socks:
+                        p._rt_live = False
+                        socks[p] = self._viz_register(p.name, p.size)
                 
-                log.debug("--Checking exnode validity")
-                i, excess = 0, []
-                for alloc in chunks:
-                    if alloc.offset > i: raise SatisfactionError("Incomplete file, cannot transfer")
-                    i = alloc.offset + alloc.size
-                    for other in ready:
-                        if other.offset <= alloc.offset and other.size + other.offset >= alloc.size + alloc.offset:
-                            excess.append(alloc)
-                    ready.append(alloc)
-                if i < exnode.size: raise SatisfactionError("Incomplete file, too short")
+                dst = self._rt.services.where({'accessPoint': dst}) if isinstance(dst, str) else dst
+                new_allocs = []
                 
                 log.debug("--Removing excess allocations")
-                for alloc in excess:
-                    try: chunks.remove(alloc)
-                    except ValueError: pass
-                
-                if chunks:
-                    remote._rt_live, exnode._rt_live = False, False
-                    for chunk in chunks:
-                        log.debug("--Transferring allocation [{}-{}]".format(chunk.offset, chunk.offset + chunk.size))
-                        alloc = self._proxy.allocate(Depot(dst.accessPoint), 0, chunk.size)
-                        alloc.offset = chunk.offset
-                        exnode.extents.append(alloc)
-                        self._proxy.send(chunk, alloc)
-                        self._viz_progress(sock, alloc.location, alloc.size, alloc.offset)
-                        replica = alloc.clone()
-                        del alloc.getObject().__dict__['function']
-                        del replica.getObject().__dict__['function']
-                        alloc.parent = exnode
-                        replica.parent = remote
-                        remote.extents.append(replica)
-                        self._rt.insert(alloc, commit=True)
-                        self._rt.insert(replica, commit=True, publish_to=dst.unis_url)
-                    if not hasattr(dst, 'new_exnodes'): dst.extendSchema('new_exnodes', [])
-                    dst.new_exnodes.append(remote)
-                    dst.status = "UPDATE"
-                    self._rt._update(remote)
-                    self._rt._update(exnode)
-                    with self._flock:
-                        self._rt.flush()
+                for chunk in allocs:
+                    log.debug("--Transferring allocation [{}-{}]".format(chunk.offset, chunk.offset + chunk.size))
+                    ex = chunk.parent
+                    alloc = self._proxy.allocate(Depot(dst.accessPoint), 0, chunk.size)
+                    alloc.offset = chunk.offset
+                    new_allocs.append(alloc)
+                    ex.extents.append(alloc)
+                    self._proxy.send(chunk, alloc)
+                    self._viz_progress(socks[ex], alloc.location, alloc.size, alloc.offset)
+                    del alloc.getObject().__dict__['function']
+                    alloc.parent = ex
+                    self._rt.insert(alloc, commit=True)
+                    self._rt._update(ex)
+
+                if not skip_pp:
+                    for plugin in self._plugins:
+                        plugin.postprocess(new_allocs, allocs, dst, ttl)
+                with self._flock:
+                    self._rt.flush()
             finally:
-                if remote: remote._rt_live = True
-                if exnode: exnode._rt_live = True
+                [setattr(e, 'rt_live', True) for e in socks.keys()]
                 with self._lock:
-                    log.debug("Removing lock on - {}".format(exnode.name))
-                    self._enroute.remove(exnode)
-                    
-        with self._lock: self._enroute.add(exnode)
-        self._workers.add_job(_job, exnode, dst, ttl)
+                    for a in allocs:
+                        log.debug("Removing lock on - {}".format(a.parent.id))
+                        self._enroute.remove(a.parent)
+
+        with self._lock: self._enroute |= set([a.parent for a in allocs])
+        return self._workers.add_job(_job, allocs, dst, ttl)
 
     def register_policy(self, policy):
         if any([p.to_JSON() == policy.to_JSON() for p in self._active]): return
@@ -151,14 +119,16 @@ class DBLayer(object):
             else:
                 log.info("Topology changed, evaluating policies...")
                 [p.apply(self) for p in self._active]
-
+ 
+    # DEPRECIATED
     def get_policies(self):
         ferries = self._rt.services.where({"serviceType": "datalogistics:wdln:ferry"})
         return [{"ferry_name": ferry.name, "data_lifetime": 1080000} for ferry in ferries]
 
-    def get_depots(self):
-        return  list(self._rt.services.where({"serviceType": "datalogistics:wdln:ferry"})) + \
-            list(self._rt.services.where({"serviceType": "datalogistics:wdln:base"}))
+    def get_depots(self, ap=None):
+        if ap:
+            return list(filter(lambda x: x, [self._rt.services.first_where({"accessPoint": ap})]))
+        return sum([list(self._rt.services.where({"serviceType": s})) for s in self._servicetypes], [])
     
     def get_depot_list(self):
         return {**copy.deepcopy(self._depots),
