@@ -5,7 +5,6 @@ from unis.rest import UnisClient
 from unis.services import RuntimeService
 from unis.services.event import update_event
 
-
 class WDLNService(RuntimeService):
     def __init__(self, db, stage):
         self.db = db
@@ -59,11 +58,12 @@ class WDLNPlugin(Plugin):
                 
                 # duplicate new_allocs into remote
                 remote._rt_live = False
-                replica = alloc.clone()
-                del replica.getObject().__dict__['function']
-                replica.parent = remote
-                remote.extents.append(replica)
-                self.rt.insert(replica, commit=True, publish_to=dst.unis_url)
+
+            replica = alloc.clone()
+            del replica.getObject().__dict__['function']
+            replica.parent = remote
+            remote.extents.append(replica)
+            self.rt.insert(replica, commit=True, publish_to=dst.unis_url)
     
         # set remote to updated
         if not hasattr(dst, 'new_exnodes'): dst.extendSchema('new_exnodes', [])
