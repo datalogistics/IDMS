@@ -53,8 +53,11 @@ def get_app(conf):
         path = plugin.split('.')
         try:
             module = importlib.import_module('.'.join(path[:-1]))
-            db.add_post_process(getattr(module, path[-1]))
+            cls = getattr(module, path[-1])
+            db.add_post_process(cls(db, conf))
         except (ImportError, AttributeError):
+            import traceback
+            traceback.print_exc()
             logging.getLogger('idms').warn("Bad postprocessing module - {}".format(plugin))
     engine.run(db, conf['general']['loopdelay'])
     service = IDMSService(db, UnisClient.resolve(unis[0]))

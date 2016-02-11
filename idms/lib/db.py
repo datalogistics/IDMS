@@ -53,7 +53,7 @@ class DBLayer(object):
     def add_post_process(self, cb):
         self._plugins.append(cb)
 
-    def move_allocs(self, allocs, dst=None, ttl=None):
+    def move_allocs(self, allocs, dst=None, ttl=None, skip_pp=False):
         log.info("Moving [{}] {}->{}".format(allocs[0].parent.id, ",".join([str(a.offset) for a in allocs]), dst.name))
         def _job(allocs, dst, ttl):
             socks = {}
@@ -82,8 +82,9 @@ class DBLayer(object):
                     self._rt.insert(alloc, commit=True)
                     self._rt._update(ex)
 
-                for pp in self._plugins:
-                    pp(self._rt, new_allocs, allocs, dst, ttl)
+                if not skip_pp:
+                    for plugin in self._plugins:
+                        plugin.postprocess(new_allocs, allocs, dst, ttl)
                 with self._flock:
                     self._rt.flush()
             finally:
@@ -94,7 +95,7 @@ class DBLayer(object):
                         self._enroute.remove(a.parent)
 
         with self._lock: self._enroute |= set([a.parent for a in allocs])
-        self._workers.add_job(_job, allocs, dst, ttl)
+        return self._workers.add_job(_job, allocs, dst, ttl)
 
     def register_policy(self, policy):
         if any([p.to_JSON() == policy.to_JSON() for p in self._active]): return

@@ -16,7 +16,7 @@ PREAMBLE, HEADERS, BODY, COMPLETE = list(range(4))
 class FileHandler(_BaseHandler):
     def _folder(self, root, s):
         return [{'id': e.id, 'mode': e.mode,
-                 'name': e.name, 'content': self._folder(e, s)} for e in s({'parent': root})]
+                 'name': e.name, 'content': self._folder(e, s)} for e in s(lambda x: x.parent == root and not hasattr(x, 'replica_of'))]
     @falcon.after(_BaseHandler.encode_response)
     def on_get(self, req, resp):
         resp.body = self._folder(None, self._db._rt.exnodes.where)

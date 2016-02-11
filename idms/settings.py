@@ -32,7 +32,7 @@ MIME = {
 STATIC_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "public")
 
 PLUGINS = [
-    #"idms.plugins.wdln.post"
+    "idms.plugins.wdln.WDLNPlugin"
 ]
 
 SERVICE_TYPES = [
