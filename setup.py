@@ -12,4 +12,10 @@ setup(name        = 'unisdispatcher',
               'unisdispatcherd = exnodemanager.app:main',
           ]
       },
+      install_requires = {
+          "tornado",
+          "requests",
+          "futures",
+          "ws4py"
+          }
   )
