@@ -21,7 +21,7 @@ class CompositePolicy(Policy):
                 tmpPolicy = policy_class(**policy["args"])
 
                 if "priority" in policy:
-                    tmpPolicy.priority = priority
+                    tmpPolicy.priority = policy["priority"]
                 for _filter in policy["filters"]:
                     self._log.info("    Adding filter: {filt}".format(filt = _filter["class"]))
                     filter_class = self.get_class(_filter["class"])
@@ -53,7 +53,7 @@ class CompositePolicy(Policy):
     
     def _apply(self, exnode):
         instructions = []
-
+        
         for policy in self._policies:
             instructions.extend(policy.GetPendingChanges(exnode))
 
