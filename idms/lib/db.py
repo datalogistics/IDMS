@@ -57,8 +57,8 @@ class DBLayer(object):
                             self._rt.insert(new_alloc, commit=True)
                             exnode.extents.append(new_alloc)
                 dst.status = "UPDATE"
-                self._rt.update(exnode)
-                self._rt.update(dst)
+                self._rt._update(exnode)
+                self._rt._update(dst)
                 remote.flush()
                 self._rt.flush()
 
