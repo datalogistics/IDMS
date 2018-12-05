@@ -5,18 +5,18 @@
     "type": "object",
     "additionalProperties": false,
     "required": [
-	"match",
-	"action"
+	"$match",
+	"$action"
     ],
     "properties": {
-	"match": {
+	"$match": {
 	    "anyOf": [
 		{ "$ref": "#/definitions/logic" },
 		{ "$ref": "#/definitions/operator" },
 		{ "$ref": "#/definitions/comparison" }
 	    ]
 	},
-	"action": {
+	"$action": {
 	    "type": "object",
 	    "$ref": "#/definitions/action"
 	}
@@ -25,15 +25,15 @@
 	"action": {
 	    "additionalProperties": false,
 	    "required": [
-		"type",
-		"args"
+		"$type",
+		"$args"
 	    ],
 	    "properties": {
-		"type": {
+		"$type": {
 		    "description": "Unique tag for each type of policy action",
 		    "type": "string"
 		},
-		"args": {
+		"$args": {
 		    "description": "arguments depend on the action type",
 		    "type": "object",
 		    "additionalProperties": true
