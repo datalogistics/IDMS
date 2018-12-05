@@ -20,7 +20,7 @@
 	    "type": "object",
 	    "$ref": "#/definitions/action"
 	}
-    }
+    },
     "definitions": {
 	"action": {
 	    "additionalProperties": false,
