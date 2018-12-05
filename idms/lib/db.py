@@ -2,6 +2,7 @@ import copy
 import itertools
 
 from asyncio import TimeoutError
+from collections import defaultdict
 from libdlt.sessions import Session
 from libdlt.schedule import BaseUploadSchedule
 from threading import RLock
@@ -13,11 +14,15 @@ from idms import settings, engine
 
 class ForceUpload(BaseUploadSchedule):
     def __init__(self, sources):
+        self._used = defaultdict(list)
         self._alt_ls = itertools.cycle(sources)
-    def get(self, source):
+    def get(self, ctx):
         for depot in self._alt_ls:
-            return depot
-
+            if depot not in self._used[ctx['offset']]:
+                self._used[ctx['offset']].append(depot)
+                return depot
+        raise IndexError
+    
 class DBLayer(object):
     def __init__(self, runtime, depots, viz):
         self._lock = RLock()
