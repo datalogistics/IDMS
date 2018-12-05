@@ -49,15 +49,19 @@
 		"$or": {
 		    "type": "array",
 		    "items": {
-			{ "$ref": "#/definitions/actionlogic" },
-			{ "$ref": "#/definitions/action" }
+			"anyOf": [
+			    { "$ref": "#/definitions/actionlogic" },
+			    { "$ref": "#/definitions/action" }
+			]
 		    }
 		},
 		"$and": {
 		    "type": "array",
 		    "items": {
-			{ "$ref": "#/definitions/actionlogic" },
-			{ "$ref": "#/definitions/action" }
+			"anyOf": [
+			    { "$ref": "#/definitions/actionlogic" },
+			    { "$ref": "#/definitions/action" }
+			]
 		    }
 		}
 	    }
