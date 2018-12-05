@@ -20,9 +20,9 @@ def register(assertion):
 
 def factory(desc):
     if "$or" in desc:
-        return assertions["$or"](policies=desc["$or"])
+        return assertions["$or"]({"policies":desc["$or"]})
     if "$and" in desc:
-        return assertions["$and"](policies=desc["$and"])
+        return assertions["$and"]({"policies":desc["$and"]})
     if "$type" not in desc or "$args" not in desc or desc["$type"] not in assertions:
         raise AssertionError("Bad assertion type - {}".format(desc[0]))
     return assertions[desc["$type"]](desc["$args"])
