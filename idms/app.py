@@ -4,7 +4,7 @@ import json
 import time
 
 from idms import engine
-from idms.handlers import PolicyHandler, PolicyTracker, SSLCheck, DepotHandler
+from idms.handlers import PolicyHandler, PolicyTracker, SSLCheck, DepotHandler, BuiltinHandler
 from idms.lib.db import DBLayer
 from idms.lib.middleware import FalconCORS
 from idms.lib.service import IDMSService
@@ -16,7 +16,8 @@ from unis import Runtime
 from unis.exceptions import ConnectionError
 
 routes = {
-    "p": {"handler": PolicyHandler},
+    "p": {"handler": BuiltinHandler},
+    "r": {"handler": PolicyHandler},
     "a": {"handler": PolicyTracker},
     "a/{exnode}": {"handler": PolicyTracker},
     "d/{ref}": {"handler": DepotHandler}

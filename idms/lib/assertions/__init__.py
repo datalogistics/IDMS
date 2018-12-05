@@ -19,9 +19,13 @@ def register(assertion):
     assertions[assertion.tag] = assertion
 
 def factory(desc):
-    if desc[0] not in assertions:
+    if "$or" in desc:
+        return assertions["$or"](policies=desc["$or"])
+    if "$and" in desc:
+        return assertions["$and"](policies=desc["$and"])
+    if "$type" not in desc or "$args" not in desc or desc["$type"] not in assertions:
         raise AssertionError("Bad assertion type - {}".format(desc[0]))
-    return assertions[desc[0]](desc[1])
+    return assertions[desc["$type"]](desc["$args"])
 
 for path in _builtin:
     register(path)

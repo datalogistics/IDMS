@@ -1,0 +1,86 @@
+* The Intelligent Data Management Service
+
+The Intelligent Data Management Service (IDMS) curates arbitrary data stored in networked object stores.
+IDMS itself is agnostic to data content and supports Ceph and IBP object stores. 
+
+** Policy Language
+
+The IDMS policy language uses JSON to define the behavior of files on the network.
+At the top level, there are two properties: ~$match~ and ~$action~.
+
+#+begin_example
+{
+  "$match": { "selfRef": "http://localhost:8888/exnodes/my_unique_selfref" },
+  "$action": { "$type": "$exact", "$args": { "dest": "ibp_01", "ttl": 10000000 } }
+}
+#+end_example
+
+As seen in the above example, the ~$match~ property can contain fields within the file metadata
+for exact matches.  The ~$action~ property contains a ~$type~ of action, each action type takes
+arguments based on the implementation of the action, which can be implemented in python as
+modules and attached to IDMS at runtime.
+
+Both ~$match~ and ~$action~ properties can be extended using logical operators.  All IDMS
+specific blocks - or keywords - start with a $.
+
+#+begin_example
+{
+  "$match": { "$or": [
+                      { "name": "foo" },
+                      { "name": "bar" }
+                    ] },
+  "$action": { "$and": [
+                        { "$type": "$exact", "$args": { "dest": "ibp_01", "ttl": 1000000 } },
+                        { "$type": "$replicate", "$args": { "copies": 3, "ttl": 1000000 } }
+                      ] }
+}
+#+end_example
+
+The above policy will take the files named ~foo~ and ~bar~ and ensure that both are fully
+stored on ~ibp_01~ and have at least 3 full replications across the entire network fabric.
+
+IDMS supports the ~$or~, ~$and~, and ~$not~ logical operators.
+
+Finally, a field may have a comparitor operator (which may in turn be combined with the above logical 
+operators.
+
+#+begin_example
+{
+  "$match": { "$and": [
+                       "name": { "$in": [ "foo", "bar" ] },
+                       "ts": { "$or": [ { "$gt": 118943459 }, { "$lt": 1000 } ] }
+                     ] },
+  "$action": { "$type": "$exact", "$args": { "dest": "ibp_01", "ttl": 1080000 } }
+}
+#+end_example
+
+** Actions
+
+*** Exact
+Ensure the matching data has at least one full replication at a specific depot
+
+|---------+------------------------------------------------------------------------|
+| ~$type~ | ~$exact~                                                               |
+| ~$args~ |                                                                        |
+| dest    | The ~name~ field of the depot to store the file                        |
+| ttl     | The amount of time to maintain a given copy on softstate object stores |
+
+
+*** Replication
+Ensure the matching data has a specific number of replications throughout the network
+
+|---------+------------------------------------------------------------------------|
+| ~$type~ | ~$replicate~                                                           |
+| ~$args~ |                                                                        |
+| copies  | The number of replications to maintain on the network                  |
+| ttl     | The amount of time to maintain a given copy on softstate object stores |
+
+*** Geofense
+Ensure the matching data has a replication within a geographic area
+
+|---------+--------------------------------------------------------------------------|
+| ~$type  | ~$geo~                                                                   |
+| ~$args~ |                                                                          |
+| poly    | A list of X,Y coordinate pairs that form the polygon containing the data |
+| ttl     | The amount of time to maintain a given copy on softstate object stores   |
+

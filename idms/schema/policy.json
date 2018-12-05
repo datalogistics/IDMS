@@ -1,0 +1,148 @@
+{
+    "$schema": "http://json-schema.org/draft-04/hyper-schema#",
+    "description": "Policy description object for IDMS",
+    "name": "Policy",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+	"match",
+	"action"
+    ],
+    "properties": {
+	"match": {
+	    "anyOf": [
+		{ "$ref": "#/definitions/logic" },
+		{ "$ref": "#/definitions/operator" },
+		{ "$ref": "#/definitions/comparison" }
+	    ]
+	},
+	"action": {
+	    "type": "object",
+	    "$ref": "#/definitions/action"
+	}
+    }
+    "definitions": {
+	"action": {
+	    "additionalProperties": false,
+	    "required": [
+		"type",
+		"args"
+	    ]
+	    "properties": {
+		"type": {
+		    "description": "Unique tag for each type of policy action",
+		    "type": "string"
+		},
+		"args": {
+		    "description": "arguments depend on the action type",
+		    "type": "object",
+		    "additionalProperties": true
+		}
+	    }
+	}
+	"actionlogic": {
+	    "description": "Logical operations for IDMS assetions",
+	    "name": "Action Logic",
+	    "type": "object",
+	    "additionalProperties": false,
+	    "properties": {
+		"$or": {
+		    "type": "array",
+		    "items": {
+			{ "$ref": "#/definitions/actionlogic" },
+			{ "$ref": "#/definitions/action" }
+		    }
+		},
+		"$and": {
+		    "type": "array",
+		    "items": {
+			{ "$ref": "#/definitions/actionlogic" },
+			{ "$ref": "#/definitions/action" }
+		    }
+		}
+	    }
+	},
+	"logic": {
+	    "description": "Logical operators for IDMS policies",
+	    "name": "Logic",
+	    "type": "object",
+	    "additionalProperties": false,
+	    "properties": {
+		"$or": {
+		    "type": "array",
+		    "items": {
+			"anyOf": [
+			    { "$ref": "#/definitions/operator" },
+			    { "$ref": "#/definitions/logic" },
+			    { "$ref": "#/definitions/comparison" }
+			]
+		    }
+		},
+		"$and": {
+		    "type": "array",
+		    "items": {
+			"anyOf": [
+			    { "$ref": "#/definitions/logic" },
+			    { "$ref": "#/definitions/operator" },
+			    { "$ref": "#/definitions/comparison" }
+			]
+		    }
+		},
+		"$not": {
+		    "type": "array",
+		    "items": {
+			"anyOf": [
+			    { "$ref": "#/definitions/logic" },
+			    { "$ref": "#/definitions/operator" },
+			    { "$ref": "#/definitions/comparison" }
+			]
+		    }
+		}
+	    }
+	},
+	"operator": {
+	    "description": "comparitive operators for IDMS policies",
+	    "name": "Operator",
+	    "type": "object",
+	    "additionalProperites": false,
+	    "properties": {
+		"$in": {
+		    "type": "array",
+		    "items": {
+			"anyOf": [
+			    { "type": "number" },
+			    { "type": "string" }
+			]
+		    }
+		},
+		"$gt": {
+		    "type": "number"
+		},
+		"$lt": {
+		    "type": "number"
+		},
+		"$gte": {
+		    "type": "number"
+		},
+		"$lte": {
+		    "type": "number"
+		}
+	    }
+	},
+	"comparison": {
+	    "description": "Matches keys to properties in corresponding exnodes",
+	    "name": "Comparison",
+	    "type": "object",
+	    "additionalProperties": {
+		"anyOf": [
+		    { "$ref": "#/definitions/logic" },
+		    { "$ref": "#/definitions/operator" },
+		    { "type": "string" },
+		    { "type": "number" },
+		    { "type": "boolean" }
+		    
+		]
+	    }
+	}
+    }
+}
