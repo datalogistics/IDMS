@@ -27,7 +27,7 @@
 	    "required": [
 		"type",
 		"args"
-	    ]
+	    ],
 	    "properties": {
 		"type": {
 		    "description": "Unique tag for each type of policy action",
@@ -39,7 +39,7 @@
 		    "additionalProperties": true
 		}
 	    }
-	}
+	},
 	"actionlogic": {
 	    "description": "Logical operations for IDMS assetions",
 	    "name": "Action Logic",
