@@ -79,7 +79,7 @@ Ensure the matching data has a specific number of replications throughout the ne
 Ensure the matching data has a replication within a geographic area
 
 |---------+--------------------------------------------------------------------------|
-| ~$type  | ~$geo~                                                                   |
+| ~$type~ | ~$geo~                                                                   |
 | ~$args~ |                                                                          |
 | poly    | A list of X,Y coordinate pairs that form the polygon containing the data |
 | ttl     | The amount of time to maintain a given copy on softstate object stores   |
