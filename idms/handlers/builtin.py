@@ -48,7 +48,7 @@ class BuiltinHandler(_BaseHandler):
                 else:
                     exact = { "$type": "$exact", "$args": {'dest': policy['ferry_name'], 'ttl': ttl } }
                     replicate = { "$type": "$replicate", "$args": {'copies': 2, 'ttl': ttl} }
-                    verb = { "$or", [exact, replicate] }
+                    verb = { "$or": [exact, replicate] }
                 policy = Policy(subject, verb)
                 policy_id = self._db.register_policy(policy)
             except KeyError as exp:
