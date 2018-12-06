@@ -54,6 +54,11 @@ operators.
 }
 #+end_example
 
+Valid comparitors are ~$lt~, ~$gt~, ~$lte~, ~$gte~, ~$regex~, and ~$in~.
+The first four are mathmatical comparitors while the latter two have 
+domain specific applications.  ~$regex~ runs a python3 style regex comparison
+on the field, while ~$in~ matches if the field is in a list of possible values.
+
 ** Actions
 
 *** Exact

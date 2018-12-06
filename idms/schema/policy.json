@@ -110,6 +110,9 @@
 	    "type": "object",
 	    "additionalProperites": false,
 	    "properties": {
+		"$regex": {
+		    "type": "string"
+		},
 		"$in": {
 		    "type": "array",
 		    "items": {

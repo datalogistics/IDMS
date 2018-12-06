@@ -27,6 +27,10 @@ class Policy(object):
             return not _comp(k, n)
         
         # Comparitors
+        def _regex(n,v):
+            test = getattr(exnode, n, None)
+            v = v if v[-1] == "$" else (v + "$")
+            return bool(re.match(v, test))
         def _in(n,v):
             test = getattr(exnode, n, None)
             return test is not None and test in v
@@ -44,7 +48,7 @@ class Policy(object):
             return test is not None and test <= v
         def _comp(v, ctx):
             lmap = {"$or": _or, "$and": _and, "$not": _not}
-            cmap = {"$in": _in, "$gt": _gt, "$lt": _lt, "$gte": _gte, "$lte": _lte}
+            cmap = {"$regex": _regex, "$in": _in, "$gt": _gt, "$lt": _lt, "$gte": _gte, "$lte": _lte}
             result = True
             for n,v in v.items():
                 fn = lmap.get(n, cmap.get(n, None))
