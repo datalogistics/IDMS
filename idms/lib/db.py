@@ -59,7 +59,7 @@ class DBLayer(object):
                     for exnode in exnodes:
                         valid = False
                         try:
-                            result = next(dst.new_exnodes.where({'name': exnode.name}))
+                            result = next(dst.new_exnodes.where(lambda x: x.name == exnode.name))
                             valid = result.exnode.size >= result.t_size
                         except StopIteration:
                             pass
