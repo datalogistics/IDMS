@@ -16,12 +16,16 @@ class ForceUpload(BaseUploadSchedule):
     def __init__(self, sources):
         self._used = defaultdict(list)
         self._alt_ls = itertools.cycle(sources)
+        self._len = len(sources)
     def get(self, ctx):
+        misses = 0
         for depot in self._alt_ls:
-            if depot not in self._used[ctx['offset']]:
+            misses += 1
+            if misses >= self._len:
+                raise IndexError
+            elif depot not in self._used[ctx['offset']]:
                 self._used[ctx['offset']].append(depot)
                 return depot
-        raise IndexError
     
 class DBLayer(object):
     def __init__(self, runtime, depots, viz):
@@ -54,7 +58,8 @@ class DBLayer(object):
                 with Session(remote, depots=depots, threads=settings.THREADS, bs=settings.BS, viz_url=self._viz) as sess:
                     for exnode in exnodes:
                         result = sess.upload(exnode.id, exnode.name, copies=1, schedule=ForceUpload([dst.accessPoint]), duration=ttl)
-                        dst.new_exnodes.append(result.exnode)
+                        if result.exnode not in dst.new_exnodes:
+                            dst.new_exnodes.append(result.exnode)
                         for alloc in result.exnode.extents:
                             new_alloc = alloc.clone()
                             new_alloc.parent = exnode
