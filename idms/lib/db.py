@@ -57,15 +57,22 @@ class DBLayer(object):
                 dst.new_exnodes = []
                 with Session(remote, depots=depots, threads=settings.THREADS, bs=settings.BS, viz_url=self._viz) as sess:
                     for exnode in exnodes:
-                        result = sess.upload(exnode.id, exnode.name, copies=1, schedule=ForceUpload([dst.accessPoint]), duration=ttl)
-                        if result.exnode not in dst.new_exnodes:
+                        valid = False
+                        try:
+                            result = next(dst.new_exnodes.where({'name': exnode.name}))
+                            valid = result.exnode.size >= result.t_size
+                        except StopIteration:
+                            pass
+                        if not valid:
+                            result = sess.upload(exnode.id, exnode.name, copies=1, schedule=ForceUpload([dst.accessPoint]), duration=ttl)
                             dst.new_exnodes.append(result.exnode)
-                        for alloc in result.exnode.extents:
-                            new_alloc = alloc.clone()
-                            new_alloc.parent = exnode
-                            del new_alloc.getObject().__dict__['function']
-                            self._rt.insert(new_alloc, commit=True)
-                            exnode.extents.append(new_alloc)
+                            for alloc in result.exnode.extents:
+                                new_alloc = alloc.clone()
+                                new_alloc.parent = exnode
+                                del new_alloc.getObject().__dict__['function']
+                                self._rt.insert(new_alloc, commit=True)
+                                exnode.extents.append(new_alloc)
+
                 dst.status = "UPDATE"
                 self._rt._update(exnode)
                 self._rt._update(dst)
