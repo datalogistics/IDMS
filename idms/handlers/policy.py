@@ -19,7 +19,8 @@ class PolicyHandler(_BaseHandler):
             resp.status = falcon.HTTP_401
             return
         try:
-            policy_id = Policy(body["$match"], body["$action"])
+            policy = Policy(body["$match"], body["$action"])
+            policy_id = self._db.register_policy(policy)
         except Exception as exp:
             resp.body = json.dumps({"errorcode": 2, "msg": "Malformed policy - {}".format(exp)})
             resp.status = falcon.HTTP_401
