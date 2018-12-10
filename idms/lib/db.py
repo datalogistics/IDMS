@@ -21,7 +21,7 @@ class ForceUpload(BaseUploadSchedule):
         misses = 0
         for depot in self._alt_ls:
             misses += 1
-            if misses >= self._len:
+            if misses > self._len:
                 raise IndexError
             elif depot not in self._used[ctx['offset']]:
                 self._used[ctx['offset']].append(depot)
