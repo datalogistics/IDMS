@@ -1,3 +1,5 @@
+import re
+
 from collections import namedtuple
 from unis.models import Exnode, Service
 
