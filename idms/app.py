@@ -2,6 +2,8 @@ import argparse
 import falcon
 import json
 import time
+import logging as plogging
+
 
 from idms import engine
 from idms.handlers import PolicyHandler, PolicyTracker, SSLCheck, DepotHandler, BuiltinHandler
@@ -64,12 +66,11 @@ def main():
     parser.add_argument('-q', '--viz_port', default='42424', type=str, help='Set the port fo the visualization effects')
     args = parser.parse_args()
     
-    level = {"NONE": logging.NOTSET, "INFO": logging.INFO, "DEBUG": logging.DEBUG, "TRACE": logging.DEBUG}[args.debug]
+    plogging.basicConfig(format='%(color)s[%(asctime)-15s] [%(levelname)s]%(reset)s %(message)s')
+    level = {"NONE": logging.NOTSET, "INFO": logging.INFO, "DEBUG": logging.DEBUG, "TRACE": logging.TRACE_ALL}[args.debug]
     log = logging.getLogger("idms")
     logging.getLogger('libdlt').setLevel(level)
     log.setLevel(level)
-    if args.debug == "TRACE":
-        trace.setLevel(logging.DEBUG, True)
     port = args.port
     unis = [str(u) for u in args.unis.split(',')]
     depots = None
