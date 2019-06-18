@@ -31,9 +31,6 @@ def _get_app(unis, depots, viz):
         try:
             rt = Runtime(unis, defer_update=True, preload=["nodes", "services"])
         except (ConnectionError, TimeoutError) as exp:
-            from unis.rest import UnisClient
-            import traceback
-            #traceback.print_exc()
             msg = "Failed to start runtime, retrying... - {}".format(exp)
             logging.getLogger('idms').warn(msg)
             time.sleep(5)
@@ -58,7 +55,7 @@ def main():
     parser = argparse.ArgumentParser(description='')
     parser.add_argument('-u', '--unis', default='http://wdln-base-station:8888', type=str,
                         help='Set the comma diliminated urls to the unis instances of interest')
-    parser.add_argument('-H', '--host', default='wdln-base-station', type=str, help='Set the host for the server')
+    parser.add_argument('-H', '--host', type=str, help='Set the host for the server')
     parser.add_argument('-p', '--port', default=8000, type=int, help='Set the port for the server')
     parser.add_argument('-d', '--debug', default="NONE", type=str, help='Set the log level')
     parser.add_argument('-D', '--depots', default='', type=str, help='Provide a file for the depot decriptions')
@@ -71,7 +68,7 @@ def main():
     log = logging.getLogger("idms")
     logging.getLogger('libdlt').setLevel(level)
     log.setLevel(level)
-    port = args.port
+    host, port = args.host if args.host else "0.0.0.0", args.port
     unis = [str(u) for u in args.unis.split(',')]
     depots = None
     if args.depots:
@@ -81,10 +78,10 @@ def main():
     app = _get_app(unis, depots, viz)
     
     from wsgiref.simple_server import make_server
-    server = make_server(args.host, port, app)
+    server = make_server(host, port, app)
     port = "" if port == 80 else port
     print("Getting topology from {}".format(unis))
-    print("Listening on {}{}{}".format(args.host,":" if port else "", port))
+    print("Listening on {}{}{}".format(host,":" if port else "", port))
     server.serve_forever()
     
 if __name__ == "__main__":
