@@ -1,4 +1,4 @@
-import copy
+import copy, os
 import itertools
 
 from asyncio import TimeoutError
@@ -48,7 +48,7 @@ class DBLayer(object):
             with Session(self._rt, depots=depots, threads=settings.THREADS, viz_url=self._viz) as sess:
                 for exnode in exnodes:
                     if exnode.selfRef not in self._local_files:
-                        sess.download(exnode.selfRef, exnode.id)
+                        sess.download(exnode.selfRef, os.path.join(settings.CACHE_DIR, exnode.id)
                         self._local_files.append(exnode.selfRef)
             if dst:
                 if isinstance(dst, str):
