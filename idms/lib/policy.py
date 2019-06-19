@@ -1,24 +1,40 @@
-import re
+import re, enum, logging
 
 from collections import namedtuple
 from unis.models import Exnode, Service
 
 from idms.lib import assertions
+from idms.lib.assertions.exceptions import SatisfactionError
 
+class Status(enum.Enum):
+    INACTIVE = 0
+    ACTIVE = 1
+    BAD = 2
+
+log = logging.getLogger('idms.policy')
 class Policy(object):
     def __init__(self, subject, verb):
         self.desc = subject
         self.verb = assertions.factory(verb)
         self._watch = set()
-        self.dirty = True
+        self._broken, self.status = [], Status.INACTIVE
 
     def apply(self, db):
         for exnode in self._watch:
-            self.verb.apply(exnode, db)
-        self.dirty = False
+            try:
+                self.verb.apply(exnode, db)
+                try: self._broken.remove(exnode)
+                except: continue
+            except SatisfactionError as e:
+                log.warn(str(e))
+                self.status = Status.BAD
+                self._broken.append(exnode)
+        if self._watch and not self._broken:
+            self.status = Status.ACTIVE
         
     def watch(self, exnode):
         self._watch.add(exnode)
+        self.status = self.status or Status.ACTIVE
     def match(self, exnode):
         # Logical ops
         def _and(n,v):

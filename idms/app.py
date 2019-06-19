@@ -3,6 +3,7 @@ import falcon
 import json
 import time
 import logging as plogging
+from lace.logging import trace
 
 
 from idms import engine
@@ -63,10 +64,11 @@ def main():
     parser.add_argument('-q', '--viz_port', default='42424', type=str, help='Set the port fo the visualization effects')
     args = parser.parse_args()
     
-    plogging.basicConfig(format='%(color)s[%(asctime)-15s] [%(levelname)s]%(reset)s %(message)s')
+    plogging.basicConfig(format='%(color)s[%(asctime)-15s] [%(levelname)s] %(name)s%(reset)s %(message)s')
     level = {"NONE": logging.NOTSET, "INFO": logging.INFO, "DEBUG": logging.DEBUG, "TRACE": logging.TRACE_ALL}[args.debug]
     log = logging.getLogger("idms")
     logging.getLogger('libdlt').setLevel(level)
+    trace.showCallDepth(True)
     log.setLevel(level)
     host, port = args.host if args.host else "0.0.0.0", args.port
     unis = [str(u) for u in args.unis.split(',')]

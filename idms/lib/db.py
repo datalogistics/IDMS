@@ -1,16 +1,14 @@
-import copy, os
-import itertools
+import copy, os, itertools
 
-from asyncio import TimeoutError
 from collections import defaultdict
+from lace.logging import trace
 from libdlt.sessions import Session
 from libdlt.schedule import BaseUploadSchedule
-from threading import RLock
-from unis import Runtime
-from unis.models import Exnode, Extent
-from unis.exceptions import ConnectionError
+from threading import Lock
+from unis.models import Exnode
 
-from idms import settings, engine
+from idms import settings
+from idms.lib.thread import ThreadManager
 
 class ForceUpload(BaseUploadSchedule):
     def __init__(self, sources):
@@ -26,107 +24,76 @@ class ForceUpload(BaseUploadSchedule):
             elif depot not in self._used[ctx['offset']]:
                 self._used[ctx['offset']].append(depot)
                 return depot
-    
+
+@trace("idms.db")
 class DBLayer(object):
     def __init__(self, runtime, depots, viz):
-        self._lock = RLock()
-        self._flock = RLock()
-        self._rt = runtime
-        self._custom_depots = depots or {}
-        self._active = []
-        self._viz = viz
-        self._local_files = []
-
-    def _get_ferry_list(self):
-        return self._rt.services.where({"serviceType": "datalogistics:wdln:ferry"})
-    def _get_base_list(self):
-        return self._rt.services.where({"serviceType": "datalogistics:wdln:base"})
-
-    def move_files(self, exnodes, dst=None, ttl=None):
-        with self._flock:
-            depots=self.get_depot_list()
-            with Session(self._rt, depots=depots, threads=settings.THREADS, viz_url=self._viz) as sess:
-                for exnode in exnodes:
-                    if exnode.selfRef not in self._local_files:
-                        sess.download(exnode.selfRef, os.path.join(settings.CACHE_DIR, exnode.id))
-                        self._local_files.append(exnode.selfRef)
+        self._rt, self._depots, self._viz = runtime, (depots or {}), viz 
+        self._workers = ThreadManager()
+        self._local_files, self._active = [], []
+        self._enroute = set()
+        self._lock = Lock()
+        
+    def move_files(self, exnode, dst=None, ttl=None):
+        def _job():
+            with self._lock: self._enroute.add((exnode, dst))
+            depots = self.get_depot_list()
+            with Session(self._rt, depots=depots, viz_url=self._viz) as sess:
+                if exnode.selfRef not in self._local_files:
+                    sess.download(exnode.selfRef, os.path.join(settings.CACHE_DIR, exnode.id))
+                    self._local_files.append(exnode.selfRef)
             if dst:
-                if isinstance(dst, str):
-                    dst = next(self._rt.services.where({'accessPoint': dst}))
-                remote = Runtime(dst.unis_url, name=dst.unis_url)
-                dst.new_exnodes = []
-                with Session(remote, depots=depots, threads=settings.THREADS, bs=settings.BS, viz_url=self._viz) as sess:
-                    for exnode in exnodes:
-                        result = sess.upload(exnode.id, exnode.name, copies=1, schedule=ForceUpload([dst.accessPoint]), duration=ttl)
-                        if result.exnode not in dst.new_exnodes:
-                            dst.new_exnodes.append(result.exnode)
-                        for alloc in result.exnode.extents:
-                            new_alloc = alloc.clone()
-                            new_alloc.parent = exnode
-                            del new_alloc.getObject().__dict__['function']
-                            self._rt.insert(new_alloc, commit=True)
-                            exnode.extents.append(new_alloc)
+                if not hasattr(dst.new_exnodes): dst.new_exnodes = []
+                dst = next(self._rt_services.where({'accessPoint': dst})) if isinstance(dst, str) else dst
+                
+                with Session(dst.unis_url, depots=depots, bs=settings.BS, viz_url=self._viz) as sess:
+                    result = sess.upload(os.path.join(settings.CACHE_DIR, exnod.id), exnode.name,
+                                         copies=1, schedule=ForceUpload([dst.accessPoint]),duration=ttl)
+                    dst.new_exnodes.append(result.exnode)
+                    for alloc in result.exnode.extents:
+                        new_alloc = self._rt.insert(alloc.clone(), commit=True)
+                        new_alloc.parent = exnode
+                        del new_alloc.getObject().__dict__['function']
+                        exnode.extents.append(new_alloc)
                 dst.status = "UPDATE"
-                self._rt._update(exnode)
-                self._rt._update(dst)
-                remote.flush()
                 self._rt.flush()
+            with self._lock: self._enroute.remove((exnode, dst))
+
+        with self._lock:
+            if (exnode, dst) not in self._enroute: self._workers.add_job(_job)
 
     def register_policy(self, policy):
-        for p in self._active:
-            if policy.to_JSON() == p.to_JSON():
-                return
-        for ex in self._rt.exnodes.where(lambda x: policy.match(x)):
-            self.move_files([ex])
-            policy.watch(ex)
-        with self._lock:
-            self._active.append(policy)
-        return len(self._active) - 1
+        if any([p.to_JSON() == policy.to_JSON() for p in self._active]): return
+        self._active.append(policy)
+        [policy.watch(ex) for ex in self._rt.exnodes.where(lambda x: policy.match(x))]
+        policy.apply(self)
 
     def get_active_policies(self, exnode=None):
-        with self._lock:
-            if exnode:
-                exnode = next(self._rt.exnodes.where({'id': exnode}))
-                result = [p for p in self._active if p.match(exnode)]
-            else:
-                result = [p for p in self._active]
-        for p in result:
-            yield p
+        for p in self._active:
+            if (not exnode) or p.match(exnode): yield p
 
     def update_policies(self, resource):
-        with self._lock:
-            if isinstance(resource, Exnode):
-                for p in self.get_active_policies():
-                    if p.match(resource):
-                        p.watch(resource)
-                        p.dirty = True
-            else:
-                for p in self.get_active_policies():
-                    p.dirty = True
-        engine.dirty.set()
+        if isinstance(resource, Exnode):
+            matches = [p for p in self._active if p.match(resource)]
+            [p.watch(resource) for p in matches]
+            [p.apply(self) for p in matches]
+        else:
+            [p.apply(self) for p in self._active]
 
     def get_policies(self):
-        dests = []
-        for ferry in self._get_ferry_list():
-            dests.append({"ferry_name": ferry.name, "data_lifetime": 108000})
-        return dests
+        ferries = self._rt.services.where({"serviceType": "datalogistics:wdln:ferry"})
+        return [{"ferry_name": ferry.name, "data_lifetime": 1080000} for ferry in ferries]
 
     def get_depots(self):
-        depots = list(self._get_ferry_list())
-        depots.extend(self._get_base_list())
-        return depots
+        return  list(self._rt.services.where({"serviceType": "datalogistics:wdln:ferry"})) + \
+            list(self._rt.services.where({"serviceType": "datalogistics:wdln:base"}))
+    
     def get_depot_list(self):
-        depots = copy.deepcopy(self._custom_depots)
-        for ferry in self._get_ferry_list():
-            depots[ferry.accessPoint] = {"enabled": True}
-        for depot in self._rt.services.where({"serviceType": "ibp_server"}):
-            depots[depot.accessPoint] = {"enabled": True}
-        for base in self._get_base_list():
-            depots[base.accessPoint] = {"enabled": True}
-        return depots
-
-    def manage_depots(self, ref, attrs):
-        service = next(self._rt.services.where({'id': ref}))
-        for k,v in attrs.items():
-            setattr(service, k, v)
+        return {**copy.deepcopy(self._custom_depots),
+                **{f.accessPoint: {"enabled": True} for f in self.get_depots()},
+                **{f.accessPoint: {"enabled": True} for f in self._rt.services.where({"serviceType": "ibp_server"})}}
+    
+    def manage_depots(self):
+        service = self._rt.services.first_where({'id': ref})
+        [setattr(service, k, v) for k,v in services.items()]
         self._rt.flush()

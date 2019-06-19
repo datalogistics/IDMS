@@ -1,33 +1,22 @@
 from lace import logging
-from threading import Thread, Lock, Event
+from threading import Thread
+from time import sleep
 
-from idms.lib.assertions.exceptions import AssertionError
+from idms.settings import ENGINE_LOOP_DELAY
 
-dirty = Event()
 def run(db):
-    log = logging.getLogger("idms")
+    log = logging.getLogger("idms.engine")
     def _loop():
         while True:
-            dirty.wait()
-            dirty.clear()
-            log.info("Detected topology change")
-
+            sleep(ENGINE_LOOP_DELAY)
             try:
-                for i,p in enumerate(db.get_active_policies()):
-                    if p.dirty:
-                        log.warn("Policy marked as dirty - validating")
-                        try:
-                            p.apply(db)
-                        except AssertionError:
-                            log.warn("Satisfaction error in policy {}".format(i))
+                [p.apply(db) for p in db.get_active_policies()]
+                if list(db.get_active_policies()):
+                    stats = [p.status for p in db.get_active_policies()]
+                    _print_status([p.status for p in db.get_active_policies()])
+                    log.debug(stats)
             except Exception as exp:
-                import traceback
-                traceback.print_exc()
-                log.error("Failure during policy application - {}".format(exp))
-
-            status = [not p.dirty for p in db.get_active_policies()]
-            if status:
-                _print_status(status)
+                log.warn("Failure during policy application - {}".format(exp))
 
     runner = Thread(target=_loop, name="idms_engine", daemon=True)
     runner.start()
@@ -56,14 +45,9 @@ def _print_status(status):
     print("\u2524")
     
     # print statuses
+    colors = ["\033[90m", "\033[92m", "\033[91m"]
     print("\u2502", end='')
-    for stat in status:
-        result = "{color}{mark}{clear}".format(**{
-            "color": "\033[0;32m" if stat else "\033[0;31m",
-            "mark":"\u2b24" if stat else "\u2718",
-            "clear": "\033[0m"
-        })
-        print("", result, "\u2502", end='')
+    [print("", "{}\u2b24\033[0m".format(colors[s.value]), "\u2502", end='') for s in status]
     print()
     
     # print bottom
