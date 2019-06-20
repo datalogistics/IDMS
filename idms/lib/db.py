@@ -75,12 +75,12 @@ class DBLayer(object):
 
     def update_policies(self, resource):
         if isinstance(resource, Exnode):
-            log.info("Modified file detected, applying policies...")
+            log.info("Modified file detected, evaluating policies...")
             matches = [p for p in self._active if p.match(resource)]
             [p.watch(resource) for p in matches]
             [p.apply(self) for p in matches]
         else:
-            log.info("Resource touched, applying policies...")
+            log.info("Topology changed, evaluating policies...")
             [p.apply(self) for p in self._active]
 
     def get_policies(self):
