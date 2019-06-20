@@ -10,7 +10,7 @@ class IDMSService(RuntimeService):
 
     @new_update_event(["services", "exnodes"])
     def new(self, resource):
-        if resource.getSource != self._master: return
+        if resource.getSource() != self._master: return
         
         if isinstance(resource, Service):
             if resource.id not in self._known or resource.ts - self._known[resource.id] > getattr(resource, 'ttl', 0):
