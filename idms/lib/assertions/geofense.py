@@ -41,6 +41,6 @@ class GeoFense(AbstractAssertion):
         if offset < exnode.size:
             if not valid_depots:
                 raise SatisfactionError("No depots found within the fense")
-            db.move_files([exnode], valid_depots.pop(), self._ttl)
+            db.move_files(exnode, valid_depots.pop(), self._ttl)
         return not complete
 

@@ -44,6 +44,6 @@ class Replicate(AbstractAssertion):
             raise SatisfactionError("Too few depots available to satisfy replication")
 
         for _ in range(new_copies):
-            db.move_files([exnode], avail.pop(), self._ttl)
+            db.move_files(exnode, avail.pop(), self._ttl)
 
         return not any([offset < exnode.size for offset in offsets])

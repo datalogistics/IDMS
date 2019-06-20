@@ -34,7 +34,7 @@ class Exact(AbstractAssertion):
         elif self._dest.ts + (self._dest.ttl * 1000000) < time.time() * 1000000:
             raise SatisfactionError("Destination has not checked in in", self._dest.ttl)
         if not complete:
-            db.move_files([ex], self._dest, self._ttl)
+            db.move_files(ex, self._dest, self._ttl)
 
         return not complete
 
