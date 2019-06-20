@@ -36,7 +36,7 @@ class DBLayer(object):
         self._lock = Lock()
         
     def move_files(self, exnode, dst=None, ttl=None):
-        def _job():
+        def _job(exnode, dst, ttl):
             with self._lock: self._enroute.add((exnode, dst))
             depots = self.get_depot_list()
             with Session(self._rt, depots=depots, viz_url=self._viz) as sess:
@@ -44,7 +44,7 @@ class DBLayer(object):
                     sess.download(exnode.selfRef, os.path.join(settings.CACHE_DIR, exnode.id))
                     self._local_files.append(exnode.selfRef)
             if dst:
-                if not hasattr(dst.new_exnodes): dst.new_exnodes = []
+                if not hasattr(dst, 'new_exnodes'): dst.new_exnodes = []
                 dst = next(self._rt_services.where({'accessPoint': dst})) if isinstance(dst, str) else dst
                 
                 with Session(dst.unis_url, depots=depots, bs=settings.BS, viz_url=self._viz) as sess:
@@ -61,7 +61,7 @@ class DBLayer(object):
             with self._lock: self._enroute.remove((exnode, dst))
 
         with self._lock:
-            if (exnode, dst) not in self._enroute: self._workers.add_job(_job)
+            if (exnode, dst) not in self._enroute: self._workers.add_job(_job, exnode, dst, ttl)
 
     def register_policy(self, policy):
         if any([p.to_JSON() == policy.to_JSON() for p in self._active]): return
@@ -92,7 +92,7 @@ class DBLayer(object):
             list(self._rt.services.where({"serviceType": "datalogistics:wdln:base"}))
     
     def get_depot_list(self):
-        return {**copy.deepcopy(self._custom_depots),
+        return {**copy.deepcopy(self._depots),
                 **{f.accessPoint: {"enabled": True} for f in self.get_depots()},
                 **{f.accessPoint: {"enabled": True} for f in self._rt.services.where({"serviceType": "ibp_server"})}}
     

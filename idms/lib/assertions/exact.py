@@ -17,7 +17,7 @@ class Exact(AbstractAssertion):
             try:
                 self._dest = next(d for d in db.get_depots() if d.name == self._dest)
             except StopIteration:
-                raise SatisfactionError("Currently unknown destination")
+                raise SatisfactionError("Currently unknown destination - {}".format(self._dest))
         
         depot = self._dest.accessPoint
         done, complete = 0, True
