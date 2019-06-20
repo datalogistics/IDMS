@@ -1,4 +1,4 @@
-import copy, os, itertools
+import copy, os, itertools, logging
 
 from collections import defaultdict
 from lace.logging import trace
@@ -25,6 +25,7 @@ class ForceUpload(BaseUploadSchedule):
                 self._used[ctx['offset']].append(depot)
                 return depot
 
+log = logging.getLogger('idms.db')
 @trace("idms.db")
 class DBLayer(object):
     def __init__(self, runtime, depots, viz):
@@ -74,10 +75,12 @@ class DBLayer(object):
 
     def update_policies(self, resource):
         if isinstance(resource, Exnode):
+            log.info("Modified file detected, applying policies...")
             matches = [p for p in self._active if p.match(resource)]
             [p.watch(resource) for p in matches]
             [p.apply(self) for p in matches]
         else:
+            log.info("Resource touched, applying policies...")
             [p.apply(self) for p in self._active]
 
     def get_policies(self):
