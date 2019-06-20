@@ -17,6 +17,7 @@ from lace import logging
 from lace.logging import trace
 from unis import Runtime
 from unis.exceptions import ConnectionError
+from unis.rest import UnisClient
 
 routes = {
     "p": {"handler": BuiltinHandler},
@@ -37,10 +38,11 @@ def _get_app(unis, depots, viz):
             time.sleep(5)
             continue
         break
-    
+
+    master = UnisClient.resolve(unis)
     db = DBLayer(rt, depots, viz)
     engine.run(db)
-    service = IDMSService(db)
+    service = IDMSService(db, master)
     rt.addService(service)
     
     ensure_ssl = SSLCheck(conf)

@@ -1,7 +1,8 @@
-import re, enum, logging
+import re, enum, logging, copy
 
 from collections import namedtuple
 from unis.models import Exnode, Service
+from threading import Lock
 
 from idms.lib import assertions
 from idms.lib.assertions.exceptions import SatisfactionError
@@ -16,11 +17,12 @@ class Policy(object):
     def __init__(self, subject, verb):
         self.desc = subject
         self.verb = assertions.factory(verb)
-        self._watch = set()
+        self._watch, self._lock = set(), Lock()
         self._broken, self.status = [], Status.INACTIVE
 
     def apply(self, db):
-        for exnode in self._watch:
+        with self._lock: watch = copy.copy(self._watch)
+        for exnode in watch:
             try:
                 self.verb.apply(exnode, db)
                 try: self._broken.remove(exnode)
@@ -33,7 +35,7 @@ class Policy(object):
             self.status = Status.ACTIVE
         
     def watch(self, exnode):
-        self._watch.add(exnode)
+        with self._lock: self._watch.add(exnode)
         self.status = self.status or Status.ACTIVE
     def match(self, exnode):
         # Logical ops
