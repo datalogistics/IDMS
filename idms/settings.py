@@ -1,7 +1,8 @@
 import os
 
 TOKEN_TTL = 3600
-INITIAL_THREAD_COUNT = 5
+INITIAL_THREAD_COUNT = 2
+MAX_THREAD_COUNT = 5
 ENGINE_LOOP_DELAY = 30
 CACHE_DIR = os.path.expanduser('~/.idms_cache')
 try:

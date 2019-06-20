@@ -4,7 +4,7 @@ from threading import Lock, Thread
 from queue import Queue, PriorityQueue
 from lace.logging import trace
 
-from idms.settings import INITIAL_THREAD_COUNT
+from idms.settings import INITIAL_THREAD_COUNT, MAX_THREAD_COUNT
 
 @trace('idms.thread')
 class ThreadManager(object):
@@ -22,7 +22,8 @@ class ThreadManager(object):
                 self._workers.put(w)
                 
                 with self._qlock:
-                    if sum([w.utilization for w in self._worker_list]) / len(self._worker_list) > 0.8:
+                    if sum([w.utilization for w in self._worker_list]) / len(self._worker_list) > 0.8 \
+                       and len(self._worker_list) < MAX_THREAD_COUNT:
                         self.log.info("Utilization spike detected, adding workers")
                         [self._add_worker() for _ in range(math.ceil(len(self._worker_list) * 0.66))]
                         

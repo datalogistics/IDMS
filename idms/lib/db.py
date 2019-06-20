@@ -48,7 +48,7 @@ class DBLayer(object):
                 dst = next(self._rt_services.where({'accessPoint': dst})) if isinstance(dst, str) else dst
                 
                 with Session(dst.unis_url, depots=depots, bs=settings.BS, viz_url=self._viz) as sess:
-                    result = sess.upload(os.path.join(settings.CACHE_DIR, exnod.id), exnode.name,
+                    result = sess.upload(os.path.join(settings.CACHE_DIR, exnode.id), exnode.name,
                                          copies=1, schedule=ForceUpload([dst.accessPoint]),duration=ttl)
                     dst.new_exnodes.append(result.exnode)
                     for alloc in result.exnode.extents:
