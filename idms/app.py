@@ -39,7 +39,7 @@ def _get_app(unis, depots, viz):
             continue
         break
 
-    master = UnisClient.resolve(unis)
+    master = UnisClient.resolve(unis[0])
     db = DBLayer(rt, depots, viz)
     engine.run(db)
     service = IDMSService(db, master)
