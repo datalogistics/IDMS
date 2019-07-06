@@ -5,6 +5,7 @@ from queue import Queue, PriorityQueue
 from lace.logging import trace
 
 from idms.settings import INITIAL_THREAD_COUNT, MAX_THREAD_COUNT
+from idms.lib.assertions.exceptions import SatisfactionError
 
 @trace('idms.thread')
 class ThreadManager(object):
@@ -50,6 +51,7 @@ class ThreadManager(object):
         runner.start()
 
     def add_job(self, job, *args, **kwargs):
+        self.log.debug("Create job -- {}>{}>{}".format(job.__name__, args[0].name, args[1].name))
         self._jobs.put(lambda: job(*args, **kwargs))
     def shutdown(self):
         if not self._jobs.empty():
@@ -80,6 +82,12 @@ class _Worker(object):
         while True:
             job = self.jobs.get()
             self.log.debug("Running job on [{}]".format(self.id))
-            with self.lock: job()
+            with self.lock:
+                try: job()
+                except SatisfactionError as e: self.log.warn(str(e))
+                except Exception as e:
+                    import traceback
+                    traceback.print_exc()
+                    self.log.error(str(e))
 
     def __lt__(a, b): return a.utilization < b.utilization

@@ -70,6 +70,7 @@ def main():
     level = {"NONE": logging.NOTSET, "INFO": logging.INFO, "DEBUG": logging.DEBUG, "TRACE": logging.TRACE_ALL}[args.debug]
     log = logging.getLogger("idms")
     logging.getLogger('libdlt').setLevel(level)
+    logging.getLogger('unis').setLevel(level)
     trace.showCallDepth(True)
     log.setLevel(level)
     host, port = args.host if args.host else "0.0.0.0", args.port

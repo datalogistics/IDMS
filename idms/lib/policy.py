@@ -23,6 +23,8 @@ class Policy(object):
     def apply(self, db):
         with self._lock: watch = copy.copy(self._watch)
         for exnode in watch:
+            log.debug(["{}\n".format(e.name) for e in db._enroute])
+            if exnode in db._enroute: continue
             try:
                 self.verb.apply(exnode, db)
                 try: self._broken.remove(exnode)
@@ -31,7 +33,7 @@ class Policy(object):
                 log.warn(str(e))
                 self.status = Status.BAD
                 self._broken.append(exnode)
-        if self._watch and not self._broken:
+        if watch and not self._broken:
             self.status = Status.ACTIVE
         
     def watch(self, exnode):

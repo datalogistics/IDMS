@@ -20,4 +20,5 @@ class IDMSService(RuntimeService):
                 self._db.update_policies(resource)
             self._known[resource.id] = getattr(resource, 'ttl', 0)
         else:
-            self._db.update_policies(resource)
+            if not hasattr(resource, 'replica_of'):
+                self._db.update_policies(resource)
