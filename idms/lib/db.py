@@ -62,10 +62,8 @@ class DBLayer(object):
                     self._rt.insert(remote, commit=True, publish_to=dst.unis_url)
 
                 log.debug("--Creating allocation list")
-                print(len(exnode.extents))
                 chunks = list(sorted([x for x in exnode.extents.where(valid)], key=lambda x: x.offset))
                 ready = list(sorted([x for x in remote.extents.where(valid)], key=lambda x: x.offset))
-                print(len(chunks), len(ready))
                 
                 log.debug("--Checking exnode validity")
                 i, excess = 0, []
