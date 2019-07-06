@@ -1,4 +1,4 @@
-import copy, os, itertools, logging
+import copy, os, itertools, logging, uuid, time
 
 from collections import defaultdict
 from lace.logging import trace
@@ -6,7 +6,9 @@ from libdlt.protocol.ibp.services import ProtocolService as IBPManager
 from libdlt.depot import Depot
 from libdlt.sessions import Session
 from libdlt.schedule import BaseUploadSchedule
+from socketIO_client import SocketIO
 from threading import RLock
+from uritools import urisplit
 from unis import Runtime
 from unis.models import Exnode
 from unis.rest import UnisClient
@@ -14,21 +16,6 @@ from unis.rest import UnisClient
 from idms import settings
 from idms.lib.thread import ThreadManager
 from idms.lib.assertions.exceptions import SatisfactionError
-
-class ForceUpload(BaseUploadSchedule):
-    def __init__(self, sources):
-        self._used = defaultdict(list)
-        self._alt_ls = itertools.cycle(sources)
-        self._len = len(sources)
-    def get(self, ctx):
-        misses = 0
-        for depot in self._alt_ls:
-            misses += 1
-            if misses > self._len:
-                raise IndexError
-            elif depot not in self._used[ctx['offset']]:
-                self._used[ctx['offset']].append(depot)
-                return depot
 
 log = logging.getLogger('idms.db')
 @trace("idms.db")
@@ -38,6 +25,30 @@ class DBLayer(object):
         self._workers, self._proxy = ThreadManager(), IBPManager()
         self._local_files, self._active = [], []
         self._lock, self._flock, self._enroute = RLock(), RLock(), set()
+
+    def _viz_register(self, name, size):
+        print(self._viz)
+        if self._viz:
+            try:
+                uid, o = uuid.uuid4().hex, urisplit(self._viz)
+                sock = SocketIO(o.host, o.port)
+                msg = {"sessionId": uid, "filename": name, "size": size, "connections": 1,
+                       "timestamp": time.time()*1e3}
+                sock.emit('peri_download_register', msg)
+                return uid, sock, name, size
+            except Exception as e:
+                log.warn(e)
+        return None
+
+    def _viz_progress(self, sock, depot, size, offset):
+        if self._viz:
+            try:
+                d = Depot(depot)
+                msg = {"sessionId": sock[0],
+                       "host":  d.host, "length": size, "offset": offset,
+                       "timestamp": time.time()*1e3}
+                sock[1].emit('peri_download_pushdata', msg)
+            except Exception as e: pass
 
     def move_files(self, exnode, dst=None, ttl=None):
         log.info("Moving {}->{}".format(exnode.id, dst.name))
@@ -61,6 +72,7 @@ class DBLayer(object):
                     remote.extendSchema('service', dst)
                     self._rt.insert(remote, commit=True, publish_to=dst.unis_url)
 
+                sock = self._viz_register(exnode.name, exnode.size)
                 log.debug("--Creating allocation list")
                 chunks = list(sorted([x for x in exnode.extents.where(valid)], key=lambda x: x.offset))
                 ready = list(sorted([x for x in remote.extents.where(valid)], key=lambda x: x.offset))
@@ -89,6 +101,7 @@ class DBLayer(object):
                         alloc.offset = chunk.offset
                         exnode.extents.append(alloc)
                         self._proxy.send(chunk, alloc)
+                        self._viz_progress(sock, alloc.location, alloc.size, alloc.offset)
                         replica = alloc.clone()
                         del alloc.getObject().__dict__['function']
                         del replica.getObject().__dict__['function']
