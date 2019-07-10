@@ -62,7 +62,8 @@ class DBLayer(object):
 
             try:
                 dst = self._rt.services.where({'accessPoint': dst}) if isinstance(dst, str) else dst
-                try: self._rt.addSources([{'url': dst.unis_url, 'enabled': True}])
+                self._rt.addSources([{'url': dst.unis_url, 'enabled': True}])
+                try: UnisClient.get_uuid(dst.unis_url)
                 except: raise SatisfactionError("Failed to connect to remote")
                 remote = self._rt.exnodes.first_where({'replica_of': exnode, 'service': dst})
                 if not remote:
@@ -105,6 +106,7 @@ class DBLayer(object):
                         replica = alloc.clone()
                         del alloc.getObject().__dict__['function']
                         del replica.getObject().__dict__['function']
+                        alloc.parent = exnode
                         replica.parent = remote
                         remote.extents.append(replica)
                         self._rt.insert(alloc, commit=True)
@@ -112,6 +114,8 @@ class DBLayer(object):
                     if not hasattr(dst, 'new_exnodes'): dst.extendSchema('new_exnodes', [])
                     dst.new_exnodes.append(remote)
                     dst.status = "UPDATE"
+                    self._rt._update(remote)
+                    self._rt._update(exnode)
                     with self._flock:
                         self._rt.flush()
             finally:
