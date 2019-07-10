@@ -1,5 +1,7 @@
 import logging
 
+from collections import defaultdict
+
 log = logging.getLogger('idms.utils')
 class ExnodeInfo(object):
     def __init__(self, ex):
@@ -20,7 +22,7 @@ class ExnodeInfo(object):
                 return [[self._chunks[i][1], self._chunks[i][1] - self._chunks[i+1][0]] for i in range(len(self._chunks) - 1)]
 
         self._views = defaultdict(_view)
-        for e in ex:
+        for e in ex.extents:
             try: self._views[e.location].fill(e.offset, e.size)
             except Exception as exp: log.warn("Bad extent - {}".format(e.id))
 
@@ -30,4 +32,4 @@ class ExnodeInfo(object):
     
     def is_complete(self, view=None):
         if view: return view in self._views and self._views[view].is_complete
-        else: return any([v.is_complete for v in self._views])
+        else: return any([v.is_complete for v in self._views.values()])
