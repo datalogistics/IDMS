@@ -86,6 +86,8 @@ class _Worker(object):
                 try: job()
                 except SatisfactionError as e: self.log.warn(str(e))
                 except Exception as e:
+                    import traceback
+                    traceback.print_exc()
                     self.log.error(str(e))
 
     def __lt__(a, b): return a.utilization < b.utilization

@@ -60,6 +60,7 @@ class DBLayer(object):
                     log.warn("Failed to connect with allocation - " + x.location)
                     return False
 
+            remote = None
             try:
                 dst = self._rt.services.where({'accessPoint': dst}) if isinstance(dst, str) else dst
                 self._rt.addSources([{'url': dst.unis_url, 'enabled': True}])
@@ -119,7 +120,8 @@ class DBLayer(object):
                     with self._flock:
                         self._rt.flush()
             finally:
-                remote._rt_live, exnode._rt_live = True, True
+                if remote: remote._rt_live = True
+                if exnode: exnode._rt_live = True
                 with self._lock:
                     log.debug("Removing lock on - {}".format(exnode.name))
                     self._enroute.remove(exnode)
