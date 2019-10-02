@@ -1,10 +1,14 @@
+import typing
+
 from idms.lib import assertions
 from idms.lib.assertions.abstract import AbstractAssertion
-from idms.lib.assertions.exceptions import SatisfactionError
 
 class Conjunction(AbstractAssertion):
+    """
+    Enforces several policies on matching data
+    """
     tag = "$and"
-    def initialize(self, policies):
+    def initialize(self, policies:typing.List[AbstractAssertion]):
         self._ls = [assertions.factory(p) for p in policies]
 
     def apply(self, exnode, runtime):

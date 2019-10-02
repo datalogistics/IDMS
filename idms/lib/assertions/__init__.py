@@ -1,6 +1,7 @@
 import importlib
 
 from idms.lib.assertions.exceptions import AssertionError
+from idms.lib.assertions.abstract import AbstractAssertion
 
 _builtin = [
     "idms.lib.assertions.and.Conjunction",

@@ -1,4 +1,4 @@
-import argparse
+import argparse, importlib
 import falcon
 import json
 import time
@@ -6,8 +6,8 @@ import logging as plogging
 from lace.logging import trace
 
 
-from idms import engine
-from idms.handlers import PolicyHandler, PolicyTracker, SSLCheck, DepotHandler, BuiltinHandler
+from idms import engine, settings
+from idms.handlers import PolicyHandler, PolicyTracker, SSLCheck, DepotHandler, BuiltinHandler, StaticHandler, FileHandler, DirHandler
 from idms.lib.db import DBLayer
 from idms.lib.middleware import FalconCORS
 from idms.lib.service import IDMSService
@@ -20,14 +20,18 @@ from unis.exceptions import ConnectionError
 from unis.rest import UnisClient
 
 routes = {
-    "p": {"handler": BuiltinHandler},
+    "f": {"handler": FileHandler},
+    "dir": {"handler": DirHandler},
+    "p": {"handler": BuiltinHandler}, # DEFUNCT
     "r": {"handler": PolicyHandler},
     "a": {"handler": PolicyTracker},
     "a/{exnode}": {"handler": PolicyTracker},
-    "d/{ref}": {"handler": DepotHandler}
+    "d/{ref}": {"handler": DepotHandler},
+    "manage": {"handler": StaticHandler},
+    "s/{ty}/{filename}": {"handler": StaticHandler}
 }
 
-def _get_app(unis, depots, viz):
+def _get_app(unis, depots, viz, staging):
     conf = {"auth": False, "secret": "a4534asdfsberwregoifgjh948u12"}
     while True:
         try:
@@ -41,12 +45,20 @@ def _get_app(unis, depots, viz):
 
     master = UnisClient.resolve(unis[0])
     db = DBLayer(rt, depots, viz)
+    for plugin in settings.PLUGINS:
+        path = plugin.split('.')
+        try:
+            module = importlib.import_module('.'.join(path[:-1]))
+            db.add_post_process(getattr(module, path[-1]))
+        except (ImportError, AttributeError):
+            logging.getLogger('idms').warn("Bad postprocessing module - {}".format(plugin))
     engine.run(db)
     service = IDMSService(db, master)
     rt.addService(service)
     
     ensure_ssl = SSLCheck(conf)
     app = falcon.API(middleware=[FalconCORS()])
+    routes['f']['staging'] = staging
     for k,v in routes.items():
         handler = v["handler"]
         del v["handler"]
@@ -63,6 +75,7 @@ def main():
     parser.add_argument('-d', '--debug', default="NONE", type=str, help='Set the log level')
     parser.add_argument('-D', '--depots', default='', type=str, help='Provide a file for the depot decriptions')
     parser.add_argument('-v', '--visualize', default='', type=str, help='Set the server for the visualization effects')
+    parser.add_argument('-S', '--staging', type=str, help="Set the accessPoint URL for the depot to stage new data")
     parser.add_argument('-q', '--viz_port', default='42424', type=str, help='Set the port fo the visualization effects')
     args = parser.parse_args()
     
@@ -80,7 +93,7 @@ def main():
         with open(args.depots) as f:
             depots = json.load(f)
     viz = "{}:{}".format(args.visualize, args.viz_port) if args.visualize else None
-    app = _get_app(unis, depots, viz)
+    app = _get_app(unis, depots, viz, args.staging)
     
     from wsgiref.simple_server import make_server
     server = make_server(host, port, app)

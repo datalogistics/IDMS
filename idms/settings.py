@@ -23,3 +23,18 @@ MIME = {
     'PSBSON': 'application/perfsonar+bson',
     'PSXML': 'application/perfsonar+xml',
 }
+
+STATIC_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "public")
+
+PLUGINS = [
+    #"idms.plugins.wdln.post"
+]
+
+SERVICE_TYPES = [
+    "datalogistics:wdln:ferry",
+    "datalogistics:wdln:base",
+    "ibp_server"
+]
+
+
+UP_BLOCKSIZE = 1024*1024*20

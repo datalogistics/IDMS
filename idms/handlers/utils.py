@@ -1,5 +1,6 @@
-import base64
 import json
+
+from collections import defaultdict
 
 def get_body(fn):
     def _f(self, req, *args, **kwargs):

@@ -16,6 +16,8 @@ def run(db):
                     _print_status([p.status for p in db.get_active_policies()])
                     log.debug(stats)
             except Exception as exp:
+                import traceback
+                traceback.print_exc()
                 log.warn("Failure during policy application - {}".format(exp))
 
     runner = Thread(target=_loop, name="idms_engine", daemon=True)

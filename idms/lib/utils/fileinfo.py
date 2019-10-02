@@ -1,10 +1,19 @@
 import logging
 
 from collections import defaultdict
+from libdlt.protocol.ibp.services import ProtocolService as IBPManager
+from libdlt.depot import Depot
 
-log = logging.getLogger('idms.utils')
+_proxy, log = IBPManager(), logging.getLogger('idms.utils')
 class ExnodeInfo(object):
-    def __init__(self, ex):
+    def __init__(self, ex, remote_validate=False):
+        def valid(x):
+            if not hasattr(x, 'depot'): x.depot = Depot(x.location)
+            try: return _proxy.probe(x)
+            except Exception as e:
+                log.warn("Failed to connect with allocation - " + x.location)
+                return False
+
         class _view(object):
             def __init__(self): self._size, self._chunks = ex.size, [[0,0]]
             def fill(self, o, s):
@@ -21,15 +30,42 @@ class ExnodeInfo(object):
             def missing(self):
                 return [[self._chunks[i][1], self._chunks[i][1] - self._chunks[i+1][0]] for i in range(len(self._chunks) - 1)]
 
-        self._views = defaultdict(_view)
-        for e in ex.extents:
-            try: self._views[e.location].fill(e.offset, e.size)
-            except Exception as exp: log.warn("Bad extent - {}".format(e.id))
+            def valid(self, offset):
+                return any([c[0] <= offset < c[1] for c in self._chunks])
+        self._allocs, self._views = [], defaultdict(_view)
+        allocs = sorted(ex.extents, key=lambda x: x.offset)
+        for e in allocs:
+            if not remote_validate or valid(e):
+                try:
+                    self._views[e.location].fill(e.offset, e.size)
+                    self._allocs.append(e)
+                except AttributeError as exp: log.warn("Bad extent - {}".format(e.id))
 
     @property
     def views(self):
-        return self._views.keys()
+        return self._views.items()
     
     def is_complete(self, view=None):
         if view: return view in self._views and self._views[view].is_complete
         else: return any([v.is_complete for v in self._views.values()])
+
+    def replicas_at(self, offset):
+        return [v for v in self._views.values() if v.valid(offset)]
+
+    def missing(self, view):
+        return self._views[view].missing()
+
+    def allocs_in(self, start, end):
+        for alloc in self._allocs:
+            if alloc.offset < end and alloc.offset + alloc.size > start:
+                yield alloc
+    
+    def fill(self, view):
+        result, todo = [], self._views[view].missing()
+        for alloc in self._allocs:
+            if todo[0][0] >= todo[0][1]: todo.pop(0)
+            if not todo: break
+            if alloc.offset + alloc.size > todo[0][0]:
+                result.append(alloc)
+                todo[0][0] = alloc.offset + alloc.size
+        return result
