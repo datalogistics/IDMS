@@ -94,6 +94,7 @@ var DropArea = DropArea || (() => {
 		if ( parent == "undefined") { parent = ""; }
 		if (placeholder_hidden) { placeholder.hide(); }
 		payload.append('parent', parent);
+		event.stopPropagation();
 		$.each(data.files, (i, f) => { payload.append('files', f); });
 		$.ajax({
 		    url: 'f',

@@ -13,16 +13,17 @@ from unis import Runtime
 from unis.models import Exnode
 from unis.rest import UnisClient
 
-from idms import settings
 from idms.lib.thread import ThreadManager
 from idms.lib.assertions.exceptions import SatisfactionError
 
 log = logging.getLogger('idms.db')
 @trace("idms.db")
 class DBLayer(object):
-    def __init__(self, runtime, depots, viz):
-        self._rt, self._depots, self._viz = runtime, (depots or {}), viz 
-        self._workers, self._proxy = ThreadManager(), IBPManager()
+    def __init__(self, runtime, depots, conf):
+        self._servicetypes = conf['general']['servicetypes']
+        self._rt, self._depots, self._viz = runtime, (depots or {}), conf['general']['vizurl']
+        self._workers = ThreadManager(conf['threads']['initialsize'], conf['threads']['max'])
+        self._proxy = IBPManager()
         self._local_files, self._active = [], []
         self._lock, self._flock, self._enroute = RLock(), RLock(), set()
         self._plugins = []
@@ -127,7 +128,7 @@ class DBLayer(object):
     def get_depots(self, ap=None):
         if ap:
             return list(filter(lambda x: x, [self._rt.services.first_where({"accessPoint": ap})]))
-        return sum([list(self._rt.services.where({"serviceType": s})) for s in settings.SERVICE_TYPES], [])
+        return sum([list(self._rt.services.where({"serviceType": s})) for s in self._servicetypes], [])
     
     def get_depot_list(self):
         return {**copy.deepcopy(self._depots),
