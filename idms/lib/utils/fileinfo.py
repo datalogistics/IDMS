@@ -1,5 +1,7 @@
 import logging
 
+from idms.lib.assertions.exceptions import SatisfactionError
+
 from collections import defaultdict
 from libdlt.protocol.ibp.services import ProtocolService as IBPManager
 from libdlt.depot import Depot
@@ -28,7 +30,8 @@ class ExnodeInfo(object):
                 return self._chunks[0][-1] == self._size
             @property
             def missing(self):
-                return [[self._chunks[i][1], self._chunks[i][1] - self._chunks[i+1][0]] for i in range(len(self._chunks) - 1)]
+                result = [[self._chunks[i][1], self._chunks[i][1] - self._chunks[i+1][0]] for i in range(len(self._chunks) - 1)]
+                return result if self._chunks[-1][1] == ex.size else result + [[self._chunks[-1][1], ex.size]]
 
             def valid(self, offset):
                 return any([c[0] <= offset < c[1] for c in self._chunks])
@@ -53,7 +56,7 @@ class ExnodeInfo(object):
         return [v for v in self._views.values() if v.valid(offset)]
 
     def missing(self, view):
-        return self._views[view].missing()
+        return self._views[view].missing
 
     def allocs_in(self, start, end):
         for alloc in self._allocs:
@@ -61,11 +64,16 @@ class ExnodeInfo(object):
                 yield alloc
     
     def fill(self, view):
-        result, todo = [], self._views[view].missing()
-        for alloc in self._allocs:
-            if todo[0][0] >= todo[0][1]: todo.pop(0)
-            if not todo: break
-            if alloc.offset + alloc.size > todo[0][0]:
-                result.append(alloc)
-                todo[0][0] = alloc.offset + alloc.size
+        result, todo = [], self._views[view].missing
+        if not todo:
+            raise SatisfactionError("No satisfying extents available to fill exnode")
+        else:
+            print(todo)
+            for alloc in self._allocs:
+                if todo[0][0] >= todo[0][1]: todo.pop(0)
+                if not todo: break
+                if alloc.offset + alloc.size > todo[0][0]:
+                    result.append(alloc)
+                    todo[0][0] = alloc.offset + alloc.size
+        print(result)
         return result

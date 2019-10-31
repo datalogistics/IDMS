@@ -14,7 +14,6 @@ from unis.models import Exnode
 from unis.rest import UnisClient
 
 from idms.lib.thread import ThreadManager
-from idms.lib.assertions.exceptions import SatisfactionError
 
 log = logging.getLogger('idms.db')
 @trace("idms.db")
@@ -29,7 +28,6 @@ class DBLayer(object):
         self._plugins = []
 
     def _viz_register(self, name, size):
-        print(self._viz)
         if self._viz:
             try:
                 uid, o = uuid.uuid4().hex, urisplit(self._viz)
@@ -56,7 +54,7 @@ class DBLayer(object):
         self._plugins.append(cb)
 
     def move_allocs(self, allocs, dst=None, ttl=None):
-        log.info("Moving [{}] {}->{}".format(allocs[0].parent.id, ",".join([a.offset for a in allocs]), dst.name))
+        log.info("Moving [{}] {}->{}".format(allocs[0].parent.id, ",".join([str(a.offset) for a in allocs]), dst.name))
         def _job(allocs, dst, ttl):
             socks = {}
             try:
@@ -83,10 +81,11 @@ class DBLayer(object):
                     alloc.parent = ex
                     self._rt.insert(alloc, commit=True)
                     self._rt._update(ex)
-                with self._flock:
-                    self._rt.flush()
+
                 for pp in self._plugins:
                     pp(self._rt, new_allocs, allocs, dst, ttl)
+                with self._flock:
+                    self._rt.flush()
             finally:
                 [setattr(e, 'rt_live', True) for e in socks.keys()]
                 with self._lock:
