@@ -1,11 +1,12 @@
 import argparse, importlib
-import falcon
+import falcon, os
 import json
 import time
 import logging as plogging
 from lace.logging import trace
 
 from idms import engine, settings
+from idms.config import MultiConfig
 from idms.handlers import PolicyHandler, PolicyTracker, SSLCheck, DepotHandler, BuiltinHandler, StaticHandler, FileHandler, DirHandler
 from idms.lib.db import DBLayer
 from idms.lib.middleware import FalconCORS
@@ -31,10 +32,10 @@ routes = {
 }
 
 def get_app(conf):
-    unis = [str(u) for u in conf['general']['dburl'].split(',')]
+    unis = [str(u) for u in conf['unis'].split(',')]
     depots = None
-    if conf['general']['depotfile']:
-        with open(conf['general']['depotfile']) as f:
+    if conf['depotfile']:
+        with open(os.path.expanduser(conf['depotfile'])) as f:
             depots = json.load(f)
 
     while True:
@@ -49,17 +50,14 @@ def get_app(conf):
 
     master = UnisClient.resolve(unis[0])
     db = DBLayer(rt, depots, conf)
-    for plugin in conf['general']['plugins']:
+    for plugin in conf['plugins']:
         path = plugin.split('.')
         try:
             module = importlib.import_module('.'.join(path[:-1]))
-            cls = getattr(module, path[-1])
-            db.add_post_process(cls(db, conf))
+            db.add_post_process(getattr(module, path[-1])(db, conf))
         except (ImportError, AttributeError):
-            import traceback
-            traceback.print_exc()
             logging.getLogger('idms').warn("Bad postprocessing module - {}".format(plugin))
-    engine.run(db, conf['general']['loopdelay'])
+    engine.run(db, conf['loopdelay'])
     service = IDMSService(db, UnisClient.resolve(unis[0]))
     rt.addService(service)
     
@@ -72,44 +70,30 @@ def get_app(conf):
     
     return app
 
-def setup_logging(level):
-    plogging.basicConfig(format='%(color)s[%(asctime)-15s] [%(levelname)s] %(name)s%(reset)s %(message)s')
-    level = {"NONE": logging.NOTSET, "INFO": logging.INFO, "DEBUG": logging.DEBUG, "TRACE": logging.TRACE_ALL}[level]
-    log = logging.getLogger("idms")
-    logging.getLogger('libdlt').setLevel(level)
-    logging.getLogger('unis').setLevel(level)
-    trace.showCallDepth(True)
-    log.setLevel(level)
-    return log
-
 conf = settings.CONFIG
 def main():
+    conf = MultiConfig(settings.CONFIG, "Intelligent Data Management Service curates objects and validates data policy",
+                       filevar="$IDMS_CONFIG")
+    conf.add_loglevel("TRACE", logging.TRACE_ALL)
     parser = argparse.ArgumentParser(description='')
     parser.add_argument('-u', '--unis', type=str,
                         help='Set the comma diliminated urls to the unis instances of interest')
     parser.add_argument('-H', '--host', type=str, help='Set the host for the server')
-    parser.add_argument('-p', '--port', default=8000, type=int, help='Set the port for the server')
-    parser.add_argument('-d', '--debug', type=str, help='Set the log level')
-    parser.add_argument('-D', '--depots', type=str, help='Provide a file for the depot decriptions')
+    parser.add_argument('-p', '--port', type=int, help='Set the port for the server')
+    parser.add_argument('-D', '--depotfile', type=str, help='Provide a file for the depot decriptions')
     parser.add_argument('-v', '--visualize', type=str, help='Set the server for the visualization effects')
-    parser.add_argument('-S', '--staging', type=str, help="Set the accessPoint URL for the depot to stage new data")
+    parser.add_argument('-S', '--upload.staging', type=str, metavar="STAGING", help="Set the accessPoint URL for the depot to stage new data")
     parser.add_argument('-q', '--viz_port', default='42424', type=str, help='Set the port fo the visualization effects')
-    args = parser.parse_args()
-    conf['general'].update(**{
-        'dburl': args.unis or conf['general']['dburl'],
-        'loglevel': args.debug or conf['general']['loglevel'],
-        'depotfile': args.depots or conf['general']['depotfile'],
-        'vizurl': "{}:{}".format(args.visualize, args.viz_port) if args.visualize else conf['general']['vizurl']
-    })
-    conf['upload']['staging'] = args.staging or conf['upload']['staging']
-    
-    log = setup_logging(conf['general']['loglevel'])
+    conf = conf.from_parser(parser, include_logging=True)
+
+    plogging.basicConfig(format='%(color)s[%(asctime)-15s] [%(levelname)s] %(name)s%(reset)s %(message)s')
+    log = logging.getLogger('idms')
     app = get_app(conf)
-    log.info("Fetching topology from {}".format(conf['general']['dburl']))
+    log.info("Fetching topology from {}".format(conf['unis']))
 
     from wsgiref.simple_server import make_server
-    host, port = args.host if args.host else "0.0.0.0", args.port
-    server = make_server(host, port, app)
+    host, port = conf['host'] if conf['host'] else "0.0.0.0", conf['port']
+    server = make_server(host, int(port), app)
     port = "" if port == 80 else port
     log.info("Listening on {}{}{}".format(host,":" if port else "", port))
     server.serve_forever()

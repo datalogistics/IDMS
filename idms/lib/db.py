@@ -19,8 +19,8 @@ log = logging.getLogger('idms.db')
 @trace("idms.db")
 class DBLayer(object):
     def __init__(self, runtime, depots, conf):
-        self._servicetypes = conf['general']['servicetypes']
-        self._rt, self._depots, self._viz = runtime, (depots or {}), conf['general']['vizurl']
+        self._servicetypes = conf['servicetypes']
+        self._rt, self._depots, self._viz = runtime, (depots or {}), conf['vizurl']
         self._workers = ThreadManager(conf['threads']['initialsize'], conf['threads']['max'])
         self._proxy = IBPManager()
         self._local_files, self._active = [], []

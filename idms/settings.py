@@ -1,4 +1,4 @@
-import os, configparser, logging
+import os, logging
 
 def expandvar(x):
     v = os.path.expandvars(x)
@@ -9,7 +9,6 @@ INITIAL_THREAD_COUNT = 2
 MAX_THREAD_COUNT = 5
 ENGINE_LOOP_DELAY = 30
 CACHE_DIR = expandvar("$IDMS_CACHE_DIR") or os.path.expanduser('~/.idms/cache')
-CONFIG_FILE = expandvar("$IDMS_CONFIG") or os.path.expanduser('~/.idms/idms.cfg')
 try:
     os.makedirs(CACHE_DIR)
 except FileExistsError:
@@ -41,17 +40,16 @@ SERVICE_TYPES = [
     "ibp_server"
 ]
 
-
 CONFIG = {
-    "general": {
-        "plugins": PLUGINS,
-        "servicetypes": SERVICE_TYPES,
-        "loopdelay": ENGINE_LOOP_DELAY,
-        "dburl": "http://localhost:30100",
-        "loglevel": "NONE",
-        "depotfile": '',
-        "vizurl": None,
-    },
+    "plugins": PLUGINS,
+    "servicetypes": SERVICE_TYPES,
+    "loopdelay": ENGINE_LOOP_DELAY,
+    "host": None,
+    "port": 8000,
+    "unis": "http://localhost:30100",
+    "loglevel": "NONE",
+    "depotfile": '',
+    "vizurl": None,
     "auth": {
         "tokenttl": TOKEN_TTL,
         "auth": False,
@@ -66,12 +64,3 @@ CONFIG = {
         "staging": ''
     }
 }
-
-_parser = configparser.ConfigParser(allow_no_value=True)
-_parser.read(CONFIG_FILE)
-_log = logging.getLogger('idms.config')
-_tys = { "true": True, "false": False, "none": None, "": None }
-for section in _parser.sections():
-    if section not in CONFIG: 
-        _log.warn(f"Bad configuration - {section}")
-    CONFIG[section].update({k:_tys.get(v, v) for k,v in _parser.items(section)})
