@@ -72,6 +72,7 @@ def get_app(conf):
 
 conf = settings.CONFIG
 def main():
+    plogging.basicConfig(format='%(color)s[%(asctime)-15s] [%(levelname)s] %(name)s%(reset)s %(message)s')
     conf = MultiConfig(settings.CONFIG, "Intelligent Data Management Service curates objects and validates data policy",
                        filevar="$IDMS_CONFIG")
     conf.add_loglevel("TRACE", logging.TRACE_ALL)
@@ -86,7 +87,6 @@ def main():
     parser.add_argument('-q', '--viz_port', default='42424', type=str, help='Set the port fo the visualization effects')
     conf = conf.from_parser(parser, include_logging=True)
 
-    plogging.basicConfig(format='%(color)s[%(asctime)-15s] [%(levelname)s] %(name)s%(reset)s %(message)s')
     log = logging.getLogger('idms')
     app = get_app(conf)
     log.info("Fetching topology from {}".format(conf['unis']))
