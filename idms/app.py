@@ -50,7 +50,7 @@ def get_app(conf):
 
     master = UnisClient.resolve(unis[0])
     db = DBLayer(rt, depots, conf)
-    for plugin in conf['plugins']:
+    for plugin in (conf['plugins'] or []):
         path = plugin.split('.')
         try:
             module = importlib.import_module('.'.join(path[:-1]))
