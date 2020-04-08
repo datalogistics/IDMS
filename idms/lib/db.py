@@ -2,6 +2,7 @@ import copy, os, itertools, logging, uuid, time
 
 from collections import defaultdict
 from lace.logging import trace
+from libdlt.protocol.ibp.exceptions import IBPError
 from libdlt.protocol.ibp.services import ProtocolService as IBPManager
 from libdlt.depot import Depot
 from libdlt.sessions import Session
@@ -13,6 +14,7 @@ from unis import Runtime
 from unis.models import Exnode
 from unis.rest import UnisClient
 
+from idms.lib.assertions.exceptions import SatisfactionError
 from idms.lib.thread import ThreadManager
 
 log = logging.getLogger('idms.db')
@@ -65,26 +67,25 @@ class DBLayer(object):
                         socks[p] = self._viz_register(p.name, p.size)
                 
                 dst = self._rt.services.where({'accessPoint': dst}) if isinstance(dst, str) else dst
-                new_allocs = []
                 
                 log.debug("--Removing excess allocations")
-                for chunk in allocs:
-                    log.debug("--Transferring allocation [{}-{}]".format(chunk.offset, chunk.offset + chunk.size))
-                    ex = chunk.parent
-                    alloc = self._proxy.allocate(Depot(dst.accessPoint), 0, chunk.size)
-                    alloc.offset = chunk.offset
-                    new_allocs.append(alloc)
-                    ex.extents.append(alloc)
-                    self._proxy.send(chunk, alloc)
-                    self._viz_progress(socks[ex], alloc.location, alloc.size, alloc.offset)
-                    del alloc.getObject().__dict__['function']
-                    alloc.parent = ex
-                    self._rt.insert(alloc, commit=True)
-                    self._rt._update(ex)
-
-                if not skip_pp:
-                    for plugin in self._plugins:
-                        plugin.postprocess(new_allocs, allocs, dst, ttl)
+                try:
+                    for chunk in allocs:
+                        log.debug("--Transferring allocation [{}-{}]".format(chunk.offset, chunk.offset + chunk.size))
+                        ex = chunk.parent
+                        alloc = self._proxy.allocate(Depot(dst.accessPoint), 0, chunk.size, timeout=2)
+                        alloc.offset = chunk.offset
+                        ex.extents.append(alloc)
+                        self._proxy.send(chunk, alloc)
+                        self._viz_progress(socks[ex], alloc.location, alloc.size, alloc.offset)
+                        del alloc.getObject().__dict__['function']
+                        alloc.parent = ex
+                        
+                        if not skip_pp: [p.postprocess(alloc, chunk, dst, ttl) for p in self._plugins]
+                        
+                        self._rt.insert(alloc, commit=True)
+                        self._rt._update(ex)
+                except (IBPError, SatisfactionError): pass
                 with self._flock:
                     self._rt.flush()
             finally:
@@ -119,7 +120,7 @@ class DBLayer(object):
             else:
                 log.info("Topology changed, evaluating policies...")
                 [p.apply(self) for p in self._active]
- 
+
     # DEPRECIATED
     def get_policies(self):
         ferries = self._rt.services.where({"serviceType": "datalogistics:wdln:ferry"})

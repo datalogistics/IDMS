@@ -37,11 +37,14 @@ class ExnodeInfo(object):
                 return any([c[0] <= offset < c[1] for c in self._chunks])
         self._allocs, self._views = [], defaultdict(_view)
         allocs = sorted(ex.extents, key=lambda x: x.offset)
+        self._meta = {}
         for e in allocs:
-            if not remote_validate or valid(e):
+            metadata = (not remove_validate) or valid(e)
+            if metadata:
                 try:
                     self._views[e.location].fill(e.offset, e.size)
                     self._allocs.append(e)
+                    self._meta[e] = metadata
                 except AttributeError as exp: log.warn("Bad extent - {}".format(e.id))
 
     @property
@@ -68,12 +71,13 @@ class ExnodeInfo(object):
         if not todo:
             raise SatisfactionError("No satisfying extents available to fill exnode")
         else:
-            print(todo)
             for alloc in self._allocs:
                 if todo[0][0] >= todo[0][1]: todo.pop(0)
                 if not todo: break
                 if alloc.offset + alloc.size > todo[0][0]:
                     result.append(alloc)
                     todo[0][0] = alloc.offset + alloc.size
-        print(result)
         return result
+
+    def __getitem__(self, e):
+        return self._meta[e]

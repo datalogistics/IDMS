@@ -40,36 +40,29 @@ class WDLNPlugin(Plugin):
         super().__init__(db, conf)
         self.rt.addService(WDLNService(db, conf['upload']['staging']))
 
-    def postprocess(self, new_allocs, old_allocs, dst, ttl):
-        remotes = []
-        # get/generate remote
+    def postprocess(self, new_alloc, old_alloc, dst, ttl):
         self.rt.addSources([{'url': dst.unis_url, 'enabled': True}])
         try: UnisClient.get_uuid(dst.unis_url)
         except: raise SatisfactionError("Failed to connect to remote")
-        for alloc in new_allocs:
-            remote = self.rt.exnodes.first_where({'replica_of': alloc.parent, 'service': dst})
-            if not remote:
-                remote = alloc.parent.clone()
-                remotes.append(remote)
-                remote.extents = []
-                remote.extendSchema('replica_of', alloc.parent)
-                remote.extendSchema('service', dst)
-                self.rt.insert(remote, commit=True, publish_to=dst.unis_url)
-                
-                # duplicate new_allocs into remote
-                remote._rt_live = False
 
-            replica = alloc.clone()
-            del replica.getObject().__dict__['function']
-            replica.parent = remote
-            remote.extents.append(replica)
-            self.rt.insert(replica, commit=True, publish_to=dst.unis_url)
-    
-        # set remote to updated
+        remote = self.rt.exnodes.first_where({'replica_of': alloc.parent, 'service': dst})
+        if not remote:
+            remote = alloc.parent.clone()
+            remote.extents = []
+            remote.extendSchema('replica_of', alloc.parent)
+            remote.extendSchema('service', dst)
+            self.rt.insert(remote, commit=True, publish_to=dst.unis_url)
+            remote._rt_live = False
+
+        replica = new_alloc.clone()
+        del replica.getObject().__dict__['function']
+        replica.parent = remote
+        remote.extents.append(replica)
+        self.rt.insert(replica, commit=True, publish_to=dst.unis_url)
+
         if not hasattr(dst, 'new_exnodes'): dst.extendSchema('new_exnodes', [])
-        for r in remotes:
-            r._rt_live = True
-            self.rt._update(r)
-            dst.new_exnodes.append(r)
+        remote._rt_live = True
+        self.rt._update(remote)
+        dst.new_exnodes.append(remote)
         dst.status = "UPDATE"
         self.rt._update(dst)
