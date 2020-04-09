@@ -55,7 +55,7 @@ class FileHandler(_BaseHandler):
             newblock = bytearray(size)
             newblock[:edge] = block[-edge:]
             return req.stream.readinto(memoryview(newblock)[edge:min(size, edge + (length -read))]), newblock
-        
+
         state, workers, exnodes, is_file = PREAMBLE, [], [], False
         payload, headers, params, name = defaultdict(list), None, None, None
         if req.content_length and req.content_type.startswith("multipart/form-data"):
@@ -213,3 +213,43 @@ class DirHandler(FileHandler):
         self._db._rt.flush()
         resp.body = self._folder(None, self._db._rt.exnodes.where)
         resp.status = falcon.HTTP_200
+
+class IBPReader(object):
+    def __init__(self, exnode):
+        self._size = exnode.size
+        self._buffer, self._head, self._allocs = b"", 0, exnode.extents
+        self._buffer = b""
+
+    def read(self, size=None):
+        print("Req:", size, len(self._buffer), self._size)
+        def alive(a):
+            if not hasattr(a, 'depot'): a.depot = Depot(a.location)
+            try: return _proxy.probe(a)
+            except: return False
+
+        rbuf = self._buffer
+        l = len(rbuf)
+
+        if self._head == self._size: return b""
+        if l == 0 or l < min(self._size - self._head, (size or 0)):
+            allocs = [a for a in self._allocs if a.offset == self._head and alive(a)]
+            if not allocs: return b""
+            
+            self._buffer += _proxy.load(allocs[0])
+            l, rbuf = len(self._buffer), self._buffer
+
+        if size is None: size = l
+        data, self._buffer = rbuf[:size], rbuf[size:]
+        self._head += size
+        print(size, len(data), len(self._buffer))
+        return data
+
+class DownloadHandler(_BaseHandler):
+    def on_get(self, req, resp, rid):
+        exnode = self._db._rt.exnodes.first_where({'id': rid})
+        if not exnode: raise falcon.HTTPBadRequest(description="Unknown exnode id")
+        resp.downloadable_as = exnode.name
+
+        resp.content_length = exnode.size
+        resp.status = falcon.HTTP_200
+        resp.stream = IBPReader(exnode)

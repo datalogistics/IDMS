@@ -3,6 +3,10 @@ var policies = new XMLHttpRequest();
 var pending_drop;
 var collapsed_folders = []
 
+$(window).click(function() {
+    $("#adownload").parent().hide();
+});
+
 function generate_policy() {
     function generate_match(root) {
 	let ty = root.data("type");
@@ -314,6 +318,17 @@ function create_filebrowser(data,status,xhr) {
         `);
 	if (v['mode'] == 'file') {
 	    template.append(_template(v));
+	    template.on('contextmenu', function(event) {
+		btn_dl = $("#adownload");
+		container = btn_dl.parent()
+		event.preventDefault();
+		container.css({ top: event.pageY, left: event.pageX });
+		container.show();
+		btn_dl.click(function(event) {
+		    $.get('sf/' + v['id']);
+		    btn_dl.parent().hide();
+		});
+	    });
 	}
 	else {
 	    let area = DropArea.build(template, 'file', true, make_cb(template));

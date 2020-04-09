@@ -7,7 +7,7 @@ from lace.logging import trace
 
 from idms import engine, settings
 from idms.config import MultiConfig
-from idms.handlers import PolicyHandler, PolicyTracker, SSLCheck, DepotHandler, BuiltinHandler, StaticHandler, FileHandler, DirHandler
+from idms.handlers import PolicyHandler, PolicyTracker, SSLCheck, DepotHandler, BuiltinHandler, StaticHandler, FileHandler, DirHandler, DownloadHandler
 from idms.lib.db import DBLayer
 from idms.lib.middleware import FalconCORS
 from idms.lib.service import IDMSService
@@ -28,7 +28,8 @@ routes = {
     "a/{exnode}": {"handler": PolicyTracker},
     "d/{ref}": {"handler": DepotHandler},
     "manage": {"handler": StaticHandler},
-    "s/{ty}/{filename}": {"handler": StaticHandler}
+    "s/{ty}/{filename}": {"handler": StaticHandler},
+    "sf/{rid}": {"handler": DownloadHandler},
 }
 
 def get_app(conf):
