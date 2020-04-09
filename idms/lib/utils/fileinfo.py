@@ -39,7 +39,7 @@ class ExnodeInfo(object):
         allocs = sorted(ex.extents, key=lambda x: x.offset)
         self._meta = {}
         for e in allocs:
-            metadata = (not remove_validate) or valid(e)
+            metadata = (not remote_validate) or valid(e)
             if metadata:
                 try:
                     self._views[e.location].fill(e.offset, e.size)
