@@ -1,4 +1,7 @@
-import falcon, json, time
+import falcon, json, time, mimetypes
+
+from threading import Thread
+from queue import Queue
 
 from collections import defaultdict
 from itertools import cycle
@@ -216,32 +219,34 @@ class DirHandler(FileHandler):
 
 class IBPReader(object):
     def __init__(self, exnode):
+        self._q = Queue(maxsize=3)
         self._size = exnode.size
-        self._buffer, self._head, self._allocs = b"", 0, exnode.extents
-        self._buffer = b""
+        self._head, self._buffer, self._allocs = 0, b"", exnode.extents
+        Thread(target=self._producer, name="dl.producer_" + exnode.id, daemon=True).start()
 
-    def read(self, size=None):
-        print("Req:", size, len(self._buffer), self._size)
+    def _producer(self):
         def alive(a):
             if not hasattr(a, 'depot'): a.depot = Depot(a.location)
             try: return _proxy.probe(a)
             except: return False
 
+        head = 0
+        for alloc in sorted([a for a in self._allocs if alive(a)], key=lambda x: x.offset):
+            if alloc.offset == head:
+                data = _proxy.load(alloc)
+                self._q.put(data)
+                head += len(data)
+        self._q.put(None)
+
+    def read(self, size=None):
         rbuf = self._buffer
-        l = len(rbuf)
-
-        if self._head == self._size: return b""
-        if l == 0 or l < min(self._size - self._head, (size or 0)):
-            allocs = [a for a in self._allocs if a.offset == self._head and alive(a)]
-            if not allocs: return b""
-            
-            self._buffer += _proxy.load(allocs[0])
-            l, rbuf = len(self._buffer), self._buffer
-
-        if size is None: size = l
+        if size is None: size = len(rbuf)
+        if len(rbuf) <= size:
+            data = self._q.get()
+            if data is None: return rbuf
+            self._buffer += data
+            rbuf = self._buffer
         data, self._buffer = rbuf[:size], rbuf[size:]
-        self._head += size
-        print(size, len(data), len(self._buffer))
         return data
 
 class DownloadHandler(_BaseHandler):
@@ -251,5 +256,5 @@ class DownloadHandler(_BaseHandler):
         resp.downloadable_as = exnode.name
 
         resp.content_length = exnode.size
-        resp.status = falcon.HTTP_200
+        resp.content_type = mimetypes.guess_type(exnode.name)[0]
         resp.stream = IBPReader(exnode)

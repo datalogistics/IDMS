@@ -13,9 +13,9 @@ class KeepAlive(AbstractAssertion):
     Ensures file does not expire from timeout.
     """
     tag = "$keepalive"
-    def initialize(self, period=600, ttl:int=180000):
-        self._ttl = ttl
-        self._period = period
+    def initialize(self, period:int=600, ttl:int=180000):
+        self._ttl = int(ttl)
+        self._period = int(period)
 
     def apply(self, exnode, db):
         proxy = IBPManager()
@@ -24,7 +24,7 @@ class KeepAlive(AbstractAssertion):
         info = ExnodeInfo(exnode, remote_validate=True)
         if not info.is_complete(): raise SatisfactionError("Exnode is incomplete, cannot maintain full copy")
         for alloc in exnode.extents:
-            if info[alloc]["duration"] < self.ttl - self._period:
+            if int(info[alloc]["duration"]) < self._ttl - self._period:
                 proxy.manage(alloc, duration=self._ttl, max_size=alloc.size)
                 alloc.lifetime.end = str(int((time.time() + self._ttl) * 1000000))
         return True

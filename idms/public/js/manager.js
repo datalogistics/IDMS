@@ -324,10 +324,7 @@ function create_filebrowser(data,status,xhr) {
 		event.preventDefault();
 		container.css({ top: event.pageY, left: event.pageX });
 		container.show();
-		btn_dl.click(function(event) {
-		    $.get('sf/' + v['id']);
-		    btn_dl.parent().hide();
-		});
+		btn_dl.attr('href', "sf/" + v['id']);
 	    });
 	}
 	else {
