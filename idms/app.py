@@ -93,11 +93,11 @@ def main():
     parser.add_argument('-q', '--viz_port', default='42424', type=str, help='Set the port fo the visualization effects')
     conf = build_conf()
     conf = conf.from_parser(parser, include_logging=True)
-
+    
     log = logging.getLogger('idms')
     app = get_app(conf)
     log.info("Fetching topology from {}".format(conf['unis']))
-
+    
     from wsgiref.simple_server import make_server
     host, port = conf['host'] if conf['host'] else "0.0.0.0", conf['port']
     server = make_server(host, int(port), app)
@@ -105,7 +105,5 @@ def main():
     log.info("Listening on {}{}{}".format(host,":" if port else "", port))
     server.serve_forever()
 
-if __name__ != "__main__":
-    application = get_app()
-else:
+if __name__ == "__main__":
     main()
