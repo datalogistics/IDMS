@@ -84,7 +84,7 @@ class _Worker(object):
         self.log.debug("Starting Worker")
         while True:
             job, tok = self.jobs.get()
-            self.log.debug("Running job on [{}]".format(self.id))
+            self.log.debug("Running job on [{}] {}".format(self.id, job))
             with self.lock:
                 try: job()
                 except SatisfactionError as e: self.log.warn(str(e))
@@ -93,6 +93,7 @@ class _Worker(object):
                     traceback.print_exc()
                     self.log.error(str(e))
                 finally:
+                    self.log.debug("<-- Completed job on [{}] {}".format(self.id, job))
                     tok.set()
 
     def __lt__(a, b): return a.utilization < b.utilization

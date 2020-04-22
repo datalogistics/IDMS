@@ -45,6 +45,7 @@ class FileHandler(_BaseHandler):
 
     @falcon.after(_BaseHandler.encode_response)
     def on_post(self, req, resp):
+        has_readinto = hasattr(req.stream, 'readinto')
         def _createfile(name):
             return Exnode({'name': name.decode('utf-8').strip('\"').strip('\''),
                            'mode': 'file',
@@ -57,7 +58,12 @@ class FileHandler(_BaseHandler):
         def _readblock(block, size, edge, length, read):
             newblock = bytearray(size)
             newblock[:edge] = block[-edge:]
-            return req.stream.readinto(memoryview(newblock)[edge:min(size, edge + (length -read))]), newblock
+            if has_readinto:
+                return req.stream.readinto(memoryview(newblock)[edge:min(size, edge + (length -read))]), newblock
+            else:
+                newsize = min(size, edge + (length - read)) - edge
+                newblock[edge:] = req.stream.read(newsize)
+                return len(newblock), newblock
 
         state, workers, exnodes, is_file = PREAMBLE, [], [], False
         payload, headers, params, name = defaultdict(list), None, None, None
@@ -218,11 +224,11 @@ class DirHandler(FileHandler):
         resp.status = falcon.HTTP_200
 
 class IBPReader(object):
-    def __init__(self, exnode):
+    def __init__(self, exnode, db):
         self._q = Queue(maxsize=3)
-        self._size = exnode.size
+        self._doclose, self._size = False, exnode.size
         self._head, self._buffer, self._allocs = 0, b"", exnode.extents
-        Thread(target=self._producer, name="dl.producer_" + exnode.id, daemon=True).start()
+        db._workers.add_job(self._producer)
 
     def _producer(self):
         def alive(a):
@@ -239,15 +245,20 @@ class IBPReader(object):
         self._q.put(None)
 
     def read(self, size=None):
+        if self._doclose: return b""
         rbuf = self._buffer
         if size is None: size = len(rbuf)
         if len(rbuf) <= size:
             data = self._q.get()
-            if data is None: return rbuf
+            if data is None:
+                self._doclose = True
+                return rbuf
             self._buffer += data
             rbuf = self._buffer
         data, self._buffer = rbuf[:size], rbuf[size:]
         return data
+
+    def close(self): pass
 
 class DownloadHandler(_BaseHandler):
     def on_get(self, req, resp, rid):
@@ -257,4 +268,4 @@ class DownloadHandler(_BaseHandler):
 
         resp.content_length = exnode.size
         resp.content_type = mimetypes.guess_type(exnode.name)[0]
-        resp.stream = IBPReader(exnode)
+        resp.stream = IBPReader(exnode, self._db)

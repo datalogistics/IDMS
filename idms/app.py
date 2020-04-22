@@ -19,20 +19,28 @@ from unis import Runtime
 from unis.exceptions import ConnectionError
 from unis.rest import UnisClient
 
-routes = {
-    "f": {"handler": FileHandler},
-    "dir": {"handler": DirHandler},
-    "p": {"handler": BuiltinHandler}, # DEFUNCT
-    "r": {"handler": PolicyHandler},
-    "a": {"handler": PolicyTracker},
-    "a/{exnode}": {"handler": PolicyTracker},
-    "d/{ref}": {"handler": DepotHandler},
-    "manage": {"handler": StaticHandler},
-    "s/{ty}/{filename}": {"handler": StaticHandler},
-    "sf/{rid}": {"handler": DownloadHandler},
-}
+def build_conf():
+    plogging.basicConfig(format='%(color)s[%(asctime)-15s] [%(levelname)s] %(name)s%(reset)s %(message)s')
+    conf = MultiConfig(settings.CONFIG, "Intelligent Data Management Service curates objects and validates data policy",
+                       filevar="$IDMS_CONFIG")
+    conf.add_loglevel("TRACE", logging.TRACE_ALL)
+    return conf
 
-def get_app(conf):
+def get_app(conf=None):
+    routes = {
+        "f": {"handler": FileHandler},
+        "dir": {"handler": DirHandler},
+        "p": {"handler": BuiltinHandler}, # DEFUNCT
+        "r": {"handler": PolicyHandler},
+        "a": {"handler": PolicyTracker},
+        "a/{exnode}": {"handler": PolicyTracker},
+        "d/{ref}": {"handler": DepotHandler},
+        "manage": {"handler": StaticHandler},
+        "s/{ty}/{filename}": {"handler": StaticHandler},
+        "sf/{rid}": {"handler": DownloadHandler},
+    }
+
+    conf = conf or build_conf().from_file(include_logging=True)
     unis = [str(u) for u in conf['unis'].split(',')]
     depots = None
     if conf['depotfile']:
@@ -72,11 +80,8 @@ def get_app(conf):
     return app
 
 conf = settings.CONFIG
+
 def main():
-    plogging.basicConfig(format='%(color)s[%(asctime)-15s] [%(levelname)s] %(name)s%(reset)s %(message)s')
-    conf = MultiConfig(settings.CONFIG, "Intelligent Data Management Service curates objects and validates data policy",
-                       filevar="$IDMS_CONFIG")
-    conf.add_loglevel("TRACE", logging.TRACE_ALL)
     parser = argparse.ArgumentParser(description='')
     parser.add_argument('-u', '--unis', type=str,
                         help='Set the comma diliminated urls to the unis instances of interest')
@@ -86,6 +91,7 @@ def main():
     parser.add_argument('-v', '--visualize', type=str, help='Set the server for the visualization effects')
     parser.add_argument('-S', '--upload.staging', type=str, metavar="STAGING", help="Set the accessPoint URL for the depot to stage new data")
     parser.add_argument('-q', '--viz_port', default='42424', type=str, help='Set the port fo the visualization effects')
+    conf = build_conf()
     conf = conf.from_parser(parser, include_logging=True)
 
     log = logging.getLogger('idms')
@@ -98,3 +104,8 @@ def main():
     port = "" if port == 80 else port
     log.info("Listening on {}{}{}".format(host,":" if port else "", port))
     server.serve_forever()
+
+if __name__ != "__main__":
+    application = get_app()
+else:
+    main()

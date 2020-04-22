@@ -33,6 +33,18 @@ class MultiConfig(object):
 
     def add_loglevel(self, n, v): self.loglevels[n] = v
 
+    def from_file(self, include_logging=False, general_tag="general"):
+        result = copy.deepcopy(self.defaults)
+        filepath = _expandvar(self.CONFIG_FILE_VAR, "")
+        for section,body in self._from_file(filepath).items():
+            if section not in result: result[section] = {}
+            if section == general_tag: [result.__setitem__(k,v) for k,v in body.items()]
+            else: [result[section].__setitem__(k,v) for k,v in body.items()]
+        if include_logging:
+            if 'loglevel' in result: logging.getLogger().setLevel(self.loglevels[result['loglevel']])
+            if 'logfile' in result: self._setup_logging(result['logfile'])
+        return result
+
     def from_parser(self, parsers, *, include_logging=False, general_tag="general"):
         parsers = parsers if isinstance(parsers, list) else [parsers]
         internal = argparse.ArgumentParser(self._desc, parents=parsers, add_help=False)
