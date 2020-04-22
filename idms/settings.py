@@ -47,7 +47,7 @@ CONFIG = {
     "host": None,
     "port": 8000,
     "unis": "http://localhost:30100",
-    "loglevel": "NONE",
+    "loglevel": "NOTSET",
     "depotfile": '',
     "vizurl": None,
     "auth": {
