@@ -1,4 +1,4 @@
-import argparse, configparser, copy, os, logging
+import argparse, configparser, copy, os, logging, logging.config
 
 
 def _expandvar(x, default):
@@ -41,7 +41,7 @@ class MultiConfig(object):
             if section == general_tag: [result.__setitem__(k,v) for k,v in body.items()]
             else: [result[section].__setitem__(k,v) for k,v in body.items()]
         if include_logging:
-            if 'loglevel' in result: logging.getLogger().setLevel(self.loglevels[result['loglevel']])
+            logging.getLogger().setLevel(self.loglevels[result['loglevel'] if 'loglevel' in result else 'NOTSET'])
             if 'logfile' in result: self._setup_logging(result['logfile'])
         return result
 
@@ -68,6 +68,6 @@ class MultiConfig(object):
             if v is not None: block[path[-1]] = v
 
         if include_logging:
-            logging.getLogger().setLevel(self.loglevels[args.loglevel])
-            if args.logfile: self._setup_logging(args.logfile)
+            logging.getLogger().setLevel(self.loglevels[result['loglevel'] if 'loglevel' in result else 'NOTSET'])
+            if 'logfile' in result: self._setup_logging(result['logfile'])
         return result
