@@ -45,11 +45,11 @@ class WDLNPlugin(Plugin):
         try: UnisClient.get_uuid(dst.unis_url)
         except: raise SatisfactionError("Failed to connect to remote")
 
-        remote = self.rt.exnodes.first_where({'replica_of': alloc.parent, 'service': dst})
+        remote = self.rt.exnodes.first_where({'replica_of': new_alloc.parent, 'service': dst})
         if not remote:
-            remote = alloc.parent.clone()
+            remote = new_alloc.parent.clone()
             remote.extents = []
-            remote.extendSchema('replica_of', alloc.parent)
+            remote.extendSchema('replica_of', new_alloc.parent)
             remote.extendSchema('service', dst)
             self.rt.insert(remote, commit=True, publish_to=dst.unis_url)
             remote._rt_live = False
