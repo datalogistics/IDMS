@@ -5,17 +5,21 @@ from unis.rest import UnisClient
 from unis.services import RuntimeService
 from unis.services.event import update_event
 
+from lace import logging
+
 class WDLNService(RuntimeService):
     def __init__(self, db, stage):
         self.db = db
         self.stage = db.get_depots(stage)
+        self.log = logging.getLogger('idms.wdln')
 
     @update_event("services")
     def check_uploads(self, service):
         if self.stage and hasattr(service, "uploaded_exnodes"):
             for ex in service.uploaded_exnodes:
+                self.log.info("Importing file - {}".format(ex.name))
                 if not len(ex.extents): continue
-                
+
                 ThreadManager.wait_for(None, self.db.move_allocs(ex.extents, self.stage[0], skip_pp=True))
                 local = ex.clone()
                 local.extents = []
