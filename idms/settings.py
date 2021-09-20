@@ -1,5 +1,7 @@
 import os, logging
 
+VERSION = 1.1.0
+
 def expandvar(x):
     v = os.path.expandvars(x)
     return None if v == x else v

@@ -92,9 +92,14 @@ def main():
     parser.add_argument('-v', '--visualize', type=str, help='Set the server for the visualization effects')
     parser.add_argument('-S', '--upload.staging', type=str, metavar="STAGING", help="Set the accessPoint URL for the depot to stage new data")
     parser.add_argument('-q', '--viz_port', default='42424', type=str, help='Set the port fo the visualization effects')
+    parser.add_argument('-V', '--version', action='store_true')
     conf = build_conf()
     conf = conf.from_parser(parser, include_logging=True)
-    
+
+    if conf['version']:
+        print("IDMS - Intelligent Data Management Service")
+        print(f"v{settings.VERSION}")
+        exit(0)
     log = logging.getLogger('idms')
     app = get_app(conf)
     log.info("Fetching topology from {}".format(conf['unis']))
