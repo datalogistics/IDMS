@@ -5,16 +5,18 @@ from unis.models import Exnode, Service
 from threading import Lock
 
 from idms.lib import assertions
-from idms.lib.assertions.exceptions import SatisfactionError
+from idms.lib.assertions.exceptions import SatisfactionError, AssertionError as SatisfactionWarning
 
 class Status(enum.Enum):
     INACTIVE = 0
     ACTIVE = 1
     BAD = 2
+    INPROG = 3
 
 log = logging.getLogger('idms.policy')
 class Policy(object):
     def __init__(self, subject, verb):
+        self.error = []
         self.desc = subject
         self.verb = assertions.factory(verb)
         self._watch, self._lock = set(), Lock()
@@ -22,20 +24,28 @@ class Policy(object):
         self.uid = uuid.uuid4()
 
     def apply(self, db):
+        complete = False
+        self.error = []
         with self._lock: watch = copy.copy(self._watch)
         for exnode in watch:
             log.debug(["{}\n".format(e.name) for e in db._enroute])
             if exnode in db._enroute: continue
             try:
-                self.verb.apply(exnode, db)
+                changed = self.verb.apply(exnode, db)
                 try: self._broken.remove(exnode)
                 except: continue
             except SatisfactionError as e:
                 log.warn(str(e))
+                self.error.append(str(e))
                 self.status = Status.BAD
                 self._broken.append(exnode)
+            except SatisfactionWarning as e:
+                self.status = Status.INACTIVE
+                self.error.append(str(e))
+                return
         if watch and not self._broken:
-            self.status = Status.ACTIVE
+            self.error = []
+            self.status = Status.INPROG if changed else Status.ACTIVE
         
     def watch(self, exnode):
         with self._lock: self._watch.add(exnode)
@@ -93,4 +103,5 @@ class Policy(object):
         return {"description": self.desc,
                 "policy": self.verb.to_JSON(),
                 "status": self.status.name,
+                "err": ", ".join(self.error),
                 "id": str(self.uid)}

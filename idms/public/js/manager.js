@@ -311,7 +311,9 @@ function create_filebrowser(data,status,xhr) {
           <div class="item idms_file ${(v['mode'] == "file" ? 'idms_match' : '')}" draggable="true" data-type="file match" data-id="${v['id']}">
             <i class="${(v['mode'] == "file" ? "file" : "teal folder")} icon"></i>
             <div class="content">
-              <div class="hidebutton header">${v['name']}</div>
+              <div class="hidebutton header">${v['name']}
+                ${(v['mode'] == "file" ? "<a href='health?id=" + v['id'] + "'><i class='right floated info grey circle icon'></i></a>" : "")}
+              </div>
               ${(v['mode'] != "file" ? "<div class='hideable list' style='padding: 0px;'></div><div class='template'><div style='min-height: 10px; min-width: 200px'></div></div>" : "")}
             </div>
           </div>
@@ -369,7 +371,6 @@ function create_filebrowser(data,status,xhr) {
     let root = { name: '/', content: data, 'mode': 'directory' }
     filelist.empty();
     filelist.append(_item(0, root));
-    //$.each(data, (i, v) => { return filelist.append(_item(i, v)); });
     filelist.find(".idms_file").each((i, v) => {
 	let val = $(v);
 	if (collapsed_folders.indexOf(val.data('id')) > -1) {
@@ -396,18 +397,24 @@ function create_folder() {
 
 function populate_active(data, status, xhr) {
     function render(policy) {
-	let icon = (policy['status'] == "BAD" ? "red times circle" : (policy['status'] == "INACTIVE" ? "grey question circle" : "green check circle"));
-	let title = (policy['status'] == "BAD" ? "Failed" : (policy['status'] == "INACTIVE" ? "No matching files" : "Valid"));
+	let map = {"ACTIVE": {"icon": "green check circle",
+			      "title": "Valid"},
+		   "INACTIVE": {"icon": "grey question circle",
+				"title": "No matching files"},
+		   "INPROG": {"icon": "green upload",
+			      "title": "In progress..."},
+		   "BAD": {"icon": "red times circle",
+			   "title": "Failed"}}
 	template = $(`
-          <div class="item"><i class="large ${icon} icon" title="${title}"></i>
+          <div class="item"><i class="large ${map[policy['status']]['icon']} icon" title="${map[policy['status']]['title']}"></i>
             <div class="content">
               <div class="header">${policy['id']}</div>
-              <div class="description"></div>
+              <div class="description">${policy['err']}</div>
           </div>
         `);
 	return template;
     }
-    $("#activelist").empty()
+    $("#activelist").empty();
     $.each(data, (i, v) => { $("#activelist").append(render(v)); });
 }
 

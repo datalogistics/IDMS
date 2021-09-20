@@ -6,3 +6,4 @@ from idms.handlers.base import SSLCheck
 from idms.handlers.depot import DepotHandler
 from idms.handlers.static import StaticHandler
 from idms.handlers.file import FileHandler, DirHandler, DownloadHandler
+from idms.handlers.exnode import HealthHandler

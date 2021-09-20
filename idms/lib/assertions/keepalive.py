@@ -18,6 +18,7 @@ class KeepAlive(AbstractAssertion):
         self._period = int(period)
 
     def apply(self, exnode, db):
+        changed = False
         proxy = IBPManager()
 
         self.log.debug("--Checking exnode health")
@@ -25,6 +26,7 @@ class KeepAlive(AbstractAssertion):
         if not info.is_complete(): raise SatisfactionError("Exnode is incomplete, cannot maintain full copy")
         for alloc in exnode.extents:
             if int(info[alloc]["duration"]) < self._ttl - self._period:
+                changed = True
                 proxy.manage(alloc, duration=self._ttl, max_size=alloc.size)
                 alloc.lifetime.end = str(int((time.time() + self._ttl) * 1000000))
-        return True
+        return changed

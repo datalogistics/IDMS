@@ -7,7 +7,7 @@ from lace.logging import trace
 
 from idms import engine, settings
 from idms.config import MultiConfig
-from idms.handlers import PolicyHandler, PolicyTracker, SSLCheck, DepotHandler, BuiltinHandler, StaticHandler, FileHandler, DirHandler, DownloadHandler
+from idms.handlers import PolicyHandler, PolicyTracker, SSLCheck, DepotHandler, BuiltinHandler, StaticHandler, FileHandler, DirHandler, DownloadHandler, HealthHandler
 from idms.lib.db import DBLayer
 from idms.lib.middleware import FalconCORS
 from idms.lib.service import IDMSService
@@ -34,9 +34,11 @@ def get_app(conf=None):
         "r": {"handler": PolicyHandler},
         "a": {"handler": PolicyTracker},
         "a/{exnode}": {"handler": PolicyTracker},
+        "h/{exnode}": {"handler": HealthHandler},
         "d/{ref}": {"handler": DepotHandler},
-        "manage": {"handler": StaticHandler},
-        "s/{ty}/{filename}": {"handler": StaticHandler},
+        "manage": {"handler": StaticHandler, "path": "index.html"},
+        "health": {"handler": StaticHandler, "path": "health.html"},
+        "s/{ty}/{filename}": {"handler": StaticHandler, "path": ""},
         "sf/{rid}": {"handler": DownloadHandler},
     }
 
@@ -73,8 +75,7 @@ def get_app(conf=None):
     ensure_ssl = SSLCheck(conf)
     app = falcon.API(middleware=[FalconCORS()])
     for k,v in routes.items():
-        handler = v["handler"]
-        del v["handler"]
+        handler = v.pop("handler")
         app.add_route("/{}".format(k), handler(conf, dblayer=db, **v))
     
     return app

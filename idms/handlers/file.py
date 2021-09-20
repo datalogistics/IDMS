@@ -7,6 +7,7 @@ from collections import defaultdict
 from itertools import cycle
 from unis.models import Exnode, Extent
 from unis.exceptions import CollectionIndexError
+from lace import logging
 
 from libdlt.protocol.ibp.services import ProtocolService as IBPManager
 from libdlt.depot import Depot
@@ -16,6 +17,7 @@ from idms.handlers.utils import get_body
 _proxy = IBPManager()
 CR, LF = ord('\r'), ord('\n')
 PREAMBLE, HEADERS, BODY, COMPLETE = list(range(4))
+log = logging.getLogger("idms.handler.file")
 class FileHandler(_BaseHandler):
     def _folder(self, root, s):
         return [{'id': e.id, 'mode': e.mode,
@@ -39,7 +41,8 @@ class FileHandler(_BaseHandler):
         if not alloc: raise Exception("Failed to connect to all depots")
         
         alloc.parent, alloc.offset = exnode, offset
-        del alloc.getObject().__dict__['function']
+        try: del alloc.getObject().__dict__['function']
+        except KeyError: pass
         exnode.extents.append(alloc)
         _proxy.store(alloc, block, len(block))
 
@@ -131,7 +134,6 @@ class FileHandler(_BaseHandler):
                         else: is_file = False
                         name = params['name'].decode('utf-8')
                         payload[name].append({'headers': headers, 'params': params, 'content': bytearray()})
-                    
                         do_read, block = False, block[bstart:]
                     elif state == PREAMBLE:
                         i = block.find(bound)
@@ -159,7 +161,6 @@ class FileHandler(_BaseHandler):
                             else: is_file = False
                             name = params['name'].decode('utf-8').strip('\"').strip("\'")
                             payload[name].append({'headers': headers, 'params': params, 'content': bytearray()})
-                            
                             do_read, block = False, block[bstart:]
                             state = BODY
                     else:
@@ -190,16 +191,18 @@ class FileHandler(_BaseHandler):
     @get_body
     @falcon.after(_BaseHandler.encode_response)
     def on_put(self, req, resp, body):
+        log.info(f"Reordering file {body['file']} ~> {body['target']}")
         try:
-            target = self._db._rt.exnodes.first_where({'id': body['target']})
+            target = self._db._rt.exnodes.first_where(lambda x: x.id == body['target'])
         except CollectionIndexError:
             target = None
         try:
-            to_move = self._db._rt.exnodes.first_where({'id': body['file']})
+            to_move = self._db._rt.exnodes.first_where(lambda x: x.id == body['file'])
         except CollectionIndexError:
             to_move = None
 
-        if target and to_move:
+        log.debug(f"--Files {to_move} ~> {target}")
+        if target and to_move and target != to_move:
             to_move.parent = target
         elif to_move:
             to_move.parent = None

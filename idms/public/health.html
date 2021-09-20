@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <link rel="shortcut icon" href="s/img/favicon.png">
+    <link rel="stylesheet" type="text/css" href="s/css/main.css">
+    <link rel="stylesheet" type="text/css" href="s/semantic/semantic.min.css">
+    <script src="s/js/jquery-3.4.1.min.js"></script>
+    <script src="s/semantic/semantic.min.js"></script>
+    <script src="s/js/health.js"></script>
+    <script type="text/javascript" src="s/js/droparea.js"></script>
+  </head>
+  <body>
+    <div class="ui padded container">
+      <div class="ui padded horizontal segments" id="divBody">
+	<div class="ui segment">
+	  <div class="ui padded grid">
+	    <div class="floated left thirteen wide column">
+	      <h1 class="ui header placeholder" id="hName"></h1>
+	    </div>
+	    <div class="floated right three wide column">
+	      <div class="ui tiny basic label">
+		Filesize<div class="detail placeholder" id="lblSize"></div>
+	      </div>
+	    </div>
+	  </div>
+	  <div class="ui middle aligned padded grid" id="divGrid">
+	    <div class="two wide column" style="margin: 0px; padding: 0px;"></div>
+	    <div class="column" style="margin: 0px; padding: 0px; text-align: right;"><div class="ui mini label">0%</div></div>
+	    <div class="twelve wide column" style="margin: 0px; padding: 0px;"><div class="ui divider"></div></div>
+	    <div class="column" style="margin: 0px; padding: 0px;"><div class="ui mini label">100%</div></div>
+	  </div>
+	</div>
+	<div class="ui segment">
+	  <div class="ui center aligned segments">
+	    <div class="ui basic center aligned segment">
+	      <div class="ui green label">Good</div>
+	    </div>
+	    <div class="ui basic center aligned segment">
+	      <div class="ui yellow label">Expired</div>
+	    </div>
+	    <div class="ui basic center aligned segment">
+	      <div class="ui disabled label">Unavailable</div>
+	    </div>
+	  </div>
+	</div>
+      </div>
+    </div>
+  </body>
+</body>

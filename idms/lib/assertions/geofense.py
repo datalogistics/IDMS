@@ -46,5 +46,4 @@ class GeoFense(AbstractAssertion):
         for d,a in allocs.items():
             db.move_allocs(a, d, self._ttl)
 
-        return True
-
+        return not bool(allocs)

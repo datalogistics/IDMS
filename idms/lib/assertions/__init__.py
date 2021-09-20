@@ -7,7 +7,8 @@ _builtin = [
     "idms.lib.assertions.and.Conjunction",
     "idms.lib.assertions.or.Disjunction",
     "idms.lib.assertions.exact.Exact",
-    "idms.lib.assertions.geofense.GeoFense",
+    "idms.lib.assertions.all.All",
+    #"idms.lib.assertions.geofense.GeoFense",
     "idms.lib.assertions.replicate.Replicate",
     "idms.lib.assertions.keepalive.KeepAlive",
 ]

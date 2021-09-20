@@ -1,7 +1,7 @@
 import time
 
 from idms.lib.assertions.abstract import AbstractAssertion
-from idms.lib.assertions.exceptions import SatisfactionError
+from idms.lib.assertions.exceptions import SatisfactionError, AssertionError as SatisfactionWarning
 from idms.lib.utils import ExnodeInfo
 
 class Exact(AbstractAssertion):
@@ -24,10 +24,13 @@ class Exact(AbstractAssertion):
         if not info.is_complete():
             raise SatisfactionError("Exnode is incomplete, cannot fill replication")
         if self._dest.status != 'READY' and self._dest.status != 'UPDATE':
-            raise SatisfactionError("Destination is not ready [{}]".format(self._dest.status))
-        elif self._dest.ts + (self._dest.ttl * 1000000) < time.time() * 1000000:
-            raise SatisfactionError("Destination ttl has expired")
-        if not info.is_complete(self._dest.accessPoint):
+            raise SatisfactionError(f"Destination is not ready [{self._dest.status}]")
+        elif getattr(dst, 'ttl', 0) and time.time() - getattr(dst, 'lastseen', 0) > getattr(dst, 'ttl'):
+            if not info.is_complete(self._dest.accessPoint):
+                raise SatisfactionError(f"Destination ttl has expired [{self._dest.name}]")
+            else:
+                raise SatisfactionWarning(f"Destination is unreachble [{self._dest.name}]")
+        elif not info.is_complete(self._dest.accessPoint):
             db.move_allocs(info.fill(self._dest.accessPoint), self._dest, self._ttl)
 
-        return not info.is_complete()
+        return not info.is_complete(self._dest.accessPoint)

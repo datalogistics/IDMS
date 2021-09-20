@@ -47,7 +47,7 @@ def _print_status(status):
     print("\u2524")
     
     # print statuses
-    colors = ["\033[90m", "\033[92m", "\033[91m"]
+    colors = ["\033[90m", "\033[92m", "\033[91m", "\033[92m"]
     print("\u2502", end='')
     [print("", "{}\u2b24\033[0m".format(colors[s.value]), "\u2502", end='') for s in status]
     print()

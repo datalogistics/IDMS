@@ -27,7 +27,8 @@ class WDLNService(RuntimeService):
                 local._rt_live = False
                 for alloc in ex.extents:
                     alloc = alloc.clone()
-                    del alloc.getObject().__dict__['function']
+                    try: del alloc.getObject().__dict__['function']
+                    except KeyError: pass
                     alloc.parent = local
                     local.extents.append(alloc)
                     self.rt.insert(alloc, commit=True)
@@ -59,7 +60,8 @@ class WDLNPlugin(Plugin):
             remote._rt_live = False
 
         replica = new_alloc.clone()
-        del replica.getObject().__dict__['function']
+        try: del replica.getObject().__dict__['function']
+        except KeyError: pass
         replica.parent = remote
         remote.extents.append(replica)
         self.rt.insert(replica, commit=True, publish_to=dst.unis_url)

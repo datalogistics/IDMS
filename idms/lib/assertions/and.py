@@ -2,6 +2,7 @@ import typing
 
 from idms.lib import assertions
 from idms.lib.assertions.abstract import AbstractAssertion
+from idms.lib.assertions.exceptions import AssertionError as SatisfactionWarning
 
 class Conjunction(AbstractAssertion):
     """
@@ -12,7 +13,13 @@ class Conjunction(AbstractAssertion):
         self._ls = [assertions.factory(p) for p in policies]
 
     def apply(self, exnode, runtime):
-        change = False
+        warn = []
+        complete = True
         for policy in self._ls:
-            change |= policy.apply(exnode, runtime)
-        return change
+            try: complete &= policy.apply(exnode, runtime)
+            except SatisfactionWarning as e:
+                warn.append(str(e))
+
+        if warn:
+            raise SatisfactionWarning(", ".join(warn))
+        return complete
