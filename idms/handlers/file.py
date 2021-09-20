@@ -13,6 +13,7 @@ from libdlt.protocol.ibp.services import ProtocolService as IBPManager
 from libdlt.depot import Depot
 from idms.handlers.base import _BaseHandler
 from idms.handlers.utils import get_body
+from idms.lib.utils.fileinfo import ExnodeInfo
 
 _proxy = IBPManager()
 CR, LF = ord('\r'), ord('\n')
@@ -20,6 +21,7 @@ PREAMBLE, HEADERS, BODY, COMPLETE = list(range(4))
 log = logging.getLogger("idms.handler.file")
 class FileHandler(_BaseHandler):
     def _folder(self, root, s):
+        print(root.name if root else root)
         return [{'id': e.id, 'mode': e.mode,
                  'name': e.name, 'content': self._folder(e, s)} for e in s(lambda x: x.parent == root and not hasattr(x, 'replica_of'))]
     @falcon.after(_BaseHandler.encode_response)
@@ -210,6 +212,17 @@ class FileHandler(_BaseHandler):
         resp.body = self._folder(None, self._db._rt.exnodes.where)
         resp.status = falcon.HTTP_200
 
+    @falcon.after(_BaseHandler.encode_response)
+    def on_delete(self, req, resp):
+        def valid(ex):
+            return ExnodeInfo(ex, True).is_complete(self._conf['upload']['staging'])
+        remove = list(self._db._rt.exnodes.where(lambda x: x.mode == "file" and not valid(x)))
+        [self._db._rt.delete(ex) for ex in remove]
+
+        resp.body = self._folder(None, self._db._rt.exnodes.where)
+        resp.status = falcon.HTTP_200
+        
+        
 class DirHandler(FileHandler):
     @get_body
     @falcon.after(_BaseHandler.encode_response)

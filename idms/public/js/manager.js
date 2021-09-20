@@ -256,6 +256,15 @@ function manual_upload(event) {
     }
 }
 
+function prune_files(event) {
+    $.ajax({
+	url: 'f',
+	type: 'DELETE',
+	error: show_filebrowser,
+	success: create_filebrowser,
+    });
+}
+
 function show_filebrowser(xhr, status) {
     $("#filebrowser").fadeOut('slow');
 }
@@ -461,6 +470,7 @@ $(window).ready(function() {
     });
     
     $("#uploadbutton").on('change', manual_upload);
+    $("#prunefiles").on('click', prune_files);
     setInterval(() => {
 	$.get({
 	    url: 'a',
