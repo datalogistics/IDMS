@@ -50,7 +50,7 @@ class ExnodeInfo(object):
     @property
     def views(self):
         return self._views.items()
-    
+
     def is_complete(self, view=None):
         if view: return view in self._views and self._views[view].is_complete
         else: return any([v.is_complete for v in self._views.values()])
@@ -65,7 +65,7 @@ class ExnodeInfo(object):
         for alloc in self._allocs:
             if alloc.offset < end and alloc.offset + alloc.size > start:
                 yield alloc
-    
+
     def fill(self, view):
         result, todo = [], self._views[view].missing
         if not todo:

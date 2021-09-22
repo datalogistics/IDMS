@@ -1,4 +1,5 @@
 from idms.lib.assertions.exceptions import SatisfactionError
+from idms.lib.utils.fileinfo import ExnodeInfo
 from idms.plugins import Plugin
 from idms.lib.thread import ThreadManager
 from unis.rest import UnisClient
@@ -32,7 +33,7 @@ class WDLNService(RuntimeService):
                     alloc.parent = local
                     local.extents.append(alloc)
                     self.rt.insert(alloc, commit=True)
-                    
+
                 ex.extendSchema('replica_of', local)
                 ex.extendSchema('service', service)
 
@@ -69,6 +70,7 @@ class WDLNPlugin(Plugin):
         if not hasattr(dst, 'new_exnodes'): dst.extendSchema('new_exnodes', [])
         remote._rt_live = True
         self.rt._update(remote)
-        dst.new_exnodes.append(remote)
+        if remote not in dst.new_exnodes and ExnodeInfo(remote).is_complete():
+            dst.new_exnodes.append(remote)
         dst.status = "UPDATE"
         self.rt._update(dst)

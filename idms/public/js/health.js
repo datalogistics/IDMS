@@ -37,7 +37,7 @@ $(document).ready(function() {
 		  mag_level++;
 		  data['rawsize'] /= 1024;
 	      }
-	      $("#lblSize").html(data['rawsize'] + mag[mag_level]);
+	      $("#lblSize").html(Math.floor(data['rawsize']) + mag[mag_level]);
 	      $("#hName").html(data['filename']).removeClass("placeholder");
 	      data['depots'].forEach((depot) => {
 		  let ac = (depot['alive'] ? "rgb(33,186,69)" : "rgb(232,232,232)");

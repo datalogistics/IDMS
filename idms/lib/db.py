@@ -65,9 +65,9 @@ class DBLayer(object):
                     if p not in socks:
                         p._rt_live = False
                         socks[p] = self._viz_register(p.name, p.size)
-                
+
                 dst = self._rt.services.where({'accessPoint': dst}) if isinstance(dst, str) else dst
-                
+
                 log.debug("--Removing excess allocations")
                 for chunk in allocs:
                     try:
@@ -82,7 +82,7 @@ class DBLayer(object):
                         alloc.parent = ex
 
                         if not skip_pp: [p.postprocess(alloc, chunk, dst, ttl) for p in self._plugins]
-                        
+
                         ex.extents.append(alloc)
                         self._rt.insert(alloc, commit=True)
                         self._rt._update(ex)
