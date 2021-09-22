@@ -66,8 +66,8 @@ def get_app(conf=None):
         try:
             module = importlib.import_module('.'.join(path[:-1]))
             db.add_post_process(getattr(module, path[-1])(db, conf))
-        except (ImportError, AttributeError):
-            logging.getLogger('idms').warn("Bad postprocessing module - {}".format(plugin))
+        except (ImportError, AttributeError) as e:
+            logging.getLogger('idms').warn(f"Bad postprocessing module [{plugin}] - {e}")
     engine.run(db, conf['loopdelay'])
     service = IDMSService(db, UnisClient.resolve(unis[0]))
     rt.addService(service)

@@ -176,6 +176,7 @@ class FileHandler(_BaseHandler):
                 return
             
 
+            print("Here!!!!!")
             self._db._workers.wait_for(workers)
             parent = payload['parent'][0]['content'].decode('utf-8') if 'parent' in payload else None
             parent = self._db._rt.exnodes.first_where(lambda x: x.id == parent)
