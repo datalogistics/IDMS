@@ -25,7 +25,7 @@ class Exact(AbstractAssertion):
             raise SatisfactionError("Exnode is incomplete, cannot fill replication")
         if self._dest.status != 'READY' and self._dest.status != 'UPDATE':
             raise SatisfactionError(f"Destination is not ready [{self._dest.status}]")
-        elif getattr(dst, 'ttl', 0) and time.time() - getattr(dst, 'lastseen', 0) > getattr(dst, 'ttl'):
+        elif getattr(self._dest, 'ttl', 0) and time.time() - getattr(self._dest, 'lastseen', 0) > getattr(self._dest, 'ttl'):
             if not info.is_complete(self._dest.accessPoint):
                 raise SatisfactionError(f"Destination ttl has expired [{self._dest.name}]")
             else:

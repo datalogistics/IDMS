@@ -21,7 +21,6 @@ PREAMBLE, HEADERS, BODY, COMPLETE = list(range(4))
 log = logging.getLogger("idms.handler.file")
 class FileHandler(_BaseHandler):
     def _folder(self, root, s):
-        print(root.name if root else root)
         return [{'id': e.id, 'mode': e.mode,
                  'name': e.name, 'content': self._folder(e, s)} for e in s(lambda x: x.parent == root and not hasattr(x, 'replica_of'))]
     @falcon.after(_BaseHandler.encode_response)
@@ -176,7 +175,6 @@ class FileHandler(_BaseHandler):
                 return
             
 
-            print("Here!!!!!")
             self._db._workers.wait_for(workers)
             parent = payload['parent'][0]['content'].decode('utf-8') if 'parent' in payload else None
             parent = self._db._rt.exnodes.first_where(lambda x: x.id == parent)

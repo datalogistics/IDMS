@@ -24,7 +24,7 @@ class Policy(object):
         self.uid = uuid.uuid4()
 
     def apply(self, db):
-        complete = False
+        changed = False
         self.error = []
         with self._lock: watch = copy.copy(self._watch)
         for exnode in watch:

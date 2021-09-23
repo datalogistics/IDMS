@@ -11,7 +11,7 @@ class All(AbstractAssertion):
     tag = "$all"
     def initialize(self, ttl:int=180000):
         self._ttl = ttl
-    
+
     def apply(self, ex, db):
         failed, warn, changed = [], [], False
         info = ExnodeInfo(ex, remote_validate=True)

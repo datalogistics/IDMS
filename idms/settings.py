@@ -7,8 +7,8 @@ def expandvar(x):
     return None if v == x else v
 
 TOKEN_TTL = 3600
-INITIAL_THREAD_COUNT = 2
-MAX_THREAD_COUNT = 5
+INITIAL_THREAD_COUNT = 1
+MAX_THREAD_COUNT = 1
 ENGINE_LOOP_DELAY = 30
 CACHE_DIR = expandvar("$IDMS_CACHE_DIR") or os.path.expanduser('~/.idms/cache')
 try:

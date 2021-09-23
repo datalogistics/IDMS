@@ -96,7 +96,8 @@ class DBLayer(object):
                 with self._lock:
                     for a in allocs:
                         log.debug("Removing lock on - {}".format(a.parent.id))
-                        self._enroute.remove(a.parent)
+                        try: self._enroute.remove(a.parent)
+                        except KeyError: pass
 
         with self._lock: self._enroute |= set([a.parent for a in allocs])
         return self._workers.add_job(_job, allocs, dst, ttl)
