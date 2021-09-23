@@ -2,7 +2,7 @@ import os, logging
 
 MAJOR_VERSION=1
 MINOR_VERSION=1
-INC_VERSION=  2
+INC_VERSION=  3
 
 def expandvar(x):
     v = os.path.expandvars(x)
