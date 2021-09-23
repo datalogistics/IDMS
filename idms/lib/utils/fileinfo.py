@@ -30,7 +30,7 @@ class ExnodeInfo(object):
                 return self._chunks[0][-1] == self._size
             @property
             def missing(self):
-                result = [[self._chunks[i][1], self._chunks[i][1] - self._chunks[i+1][0]] for i in range(len(self._chunks) - 1)]
+                result = [[self._chunks[i][1], self._chunks[i+1][0]] for i in range(len(self._chunks) - 1)]
                 return result if self._chunks[-1][1] == ex.size else result + [[self._chunks[-1][1], ex.size]]
 
             def valid(self, offset):
@@ -68,6 +68,7 @@ class ExnodeInfo(object):
 
     def fill(self, view):
         result, todo = [], self._views[view].missing
+        log.debug(f"Fill requirements - {todo}")
         if not todo:
             raise SatisfactionError("No satisfying extents available to fill exnode")
         else:
@@ -77,6 +78,7 @@ class ExnodeInfo(object):
                 if alloc.offset + alloc.size > todo[0][0]:
                     result.append(alloc)
                     todo[0][0] = alloc.offset + alloc.size
+        log.debug(f"Recommnding fill - {[a.id for a in result]}")
         return result
 
     def __getitem__(self, e):

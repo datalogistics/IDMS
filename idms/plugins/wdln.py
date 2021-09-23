@@ -72,5 +72,5 @@ class WDLNPlugin(Plugin):
         self.rt._update(remote)
         if remote not in dst.new_exnodes and ExnodeInfo(remote).is_complete():
             dst.new_exnodes.append(remote)
-        dst.status = "UPDATE"
+            dst.status = "UPDATE"
         self.rt._update(dst)
