@@ -98,7 +98,7 @@ def main():
 
     if conf['version']:
         print("IDMS - Intelligent Data Management Service")
-        print(f"v{settings.VERSION}")
+        print(f"v{settings.MAJOR_VERSION}.{settings.MINOR_VERSION}.{settings.INC_VERSION}")
         exit(0)
     log = logging.getLogger('idms')
     app = get_app(conf)
