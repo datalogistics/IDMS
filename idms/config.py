@@ -47,7 +47,7 @@ class MultiConfig(object):
 
     def from_parser(self, parsers, *, include_logging=False, general_tag="general"):
         parsers = parsers if isinstance(parsers, list) else [parsers]
-        internal = argparse.ArgumentParser(self._desc, parents=parsers, add_help=False)
+        internal = argparse.ArgumentParser(description=self._desc, parents=parsers, add_help=False)
         internal.add_argument('-c', '--configfile', type=str, help='Path to the program configuration file')
         if include_logging:
             internal.add_argument('--logfile', type=str, help='Path to the logging configuration file')

@@ -1,6 +1,5 @@
 import falcon
 import json
-import requests
 
 from idms.handlers.base import _BaseHandler
 from idms.handlers.utils import get_body

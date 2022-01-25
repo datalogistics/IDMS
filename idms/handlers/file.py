@@ -13,7 +13,7 @@ from libdlt.protocol.ibp.services import ProtocolService as IBPManager
 from libdlt.depot import Depot
 from idms.handlers.base import _BaseHandler
 from idms.handlers.utils import get_body
-from idms.lib.utils.fileinfo import ExnodeInfo
+from libdlt.util.files import ExnodeInfo
 
 _proxy = IBPManager()
 CR, LF = ord('\r'), ord('\n')

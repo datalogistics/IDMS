@@ -1,5 +1,5 @@
+from libdlt.util.files import ExnodeInfo
 from idms.lib.assertions.exceptions import SatisfactionError
-from idms.lib.utils.fileinfo import ExnodeInfo
 from idms.plugins import Plugin
 from idms.lib.thread import ThreadManager
 from unis.rest import UnisClient

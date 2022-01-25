@@ -1,4 +1,4 @@
-import falcon, json, requests, typing, inspect
+import falcon, json, typing, inspect
 
 from idms.handlers.base import _BaseHandler
 from idms.handlers.utils import get_body
