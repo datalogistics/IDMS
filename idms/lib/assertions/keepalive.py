@@ -1,10 +1,10 @@
 import time
 
 from libdlt.protocol.ibp.services import ProtocolService as IBPManager
+from libdlt.util.files import ExnodeInfo
 
 from idms.lib.assertions.abstract import AbstractAssertion
 from idms.lib.assertions.exceptions import SatisfactionError
-from idms.lib.utils import ExnodeInfo
 
 _VALID, _INVALID = 0, 1
 

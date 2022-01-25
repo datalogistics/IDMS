@@ -4,7 +4,7 @@ from collections import defaultdict
 
 from idms.lib.assertions.abstract import AbstractAssertion
 from idms.lib.assertions.exceptions import SatisfactionError
-from idms.lib.utils import ExnodeInfo
+from libdlt.util.files import ExnodeInfo
 
 _VALID, _INVALID = 0, 1
 

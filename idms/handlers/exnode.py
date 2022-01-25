@@ -4,7 +4,7 @@ from libdlt.depot import Depot
 from libdlt.protocol.ibp.services import ProtocolService as IBPManager
 
 from idms.handlers.base import _BaseHandler
-from idms.lib.utils import ExnodeInfo
+from libdlt.util.files import ExnodeInfo
 from lace import logging
 
 _proxy,log = IBPManager(), logging.getLogger('idms.handler.health')

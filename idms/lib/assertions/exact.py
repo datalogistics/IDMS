@@ -2,7 +2,7 @@ import time
 
 from idms.lib.assertions.abstract import AbstractAssertion
 from idms.lib.assertions.exceptions import SatisfactionError, AssertionError as SatisfactionWarning
-from idms.lib.utils import ExnodeInfo
+from libdlt.util.files import ExnodeInfo
 
 class Exact(AbstractAssertion):
     """
