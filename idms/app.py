@@ -1,7 +1,5 @@
 import argparse, importlib
-import falcon, os
-import json
-import time
+import falcon, os, json, time, socket
 import logging as plogging
 from lace.logging import trace
 
@@ -96,10 +94,13 @@ def main():
     conf = build_conf()
     conf = conf.from_parser(parser, include_logging=True)
 
+
     if conf['version']:
         print("IDMS - Intelligent Data Management Service")
         print(f"v{settings.MAJOR_VERSION}.{settings.MINOR_VERSION}.{settings.INC_VERSION}")
         exit(0)
+    if conf['upload']['staging'] is None:
+        conf['upload']['staging'] = f"ibp://{socket.gethostname()}:6714"
     log = logging.getLogger('idms')
     app = get_app(conf)
     log.info("Fetching topology from {}".format(conf['unis']))

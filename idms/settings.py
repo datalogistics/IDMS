@@ -65,6 +65,6 @@ CONFIG = {
     },
     "upload": {
         "blocksize": BS,
-        "staging": ''
+        "staging": None
     }
 }
