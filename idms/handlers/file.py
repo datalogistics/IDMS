@@ -141,7 +141,7 @@ class FileHandler(_BaseHandler):
                         if i == -1:
                             raise Exception("Preamble block does not close properly")
                         blob = memoryview(block)[:i+boundlen+2]
-                        if blob[:-2] == b'--': sate = COMPLETE
+                        if blob[:-2] == b'--': state = COMPLETE
                         else:
                             j = block.find(b'\r\n\r\n')
                             if j == -1:
