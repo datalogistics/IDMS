@@ -179,6 +179,7 @@ class FileHandler(_BaseHandler):
             parent = payload['parent'][0]['content'].decode('utf-8') if 'parent' in payload else None
             parent = self._db._rt.exnodes.first_where(lambda x: x.id == parent)
             for ex in exnodes:
+                if not ExnodeInfo(ex).is_complete(): continue
                 ex.parent = parent
                 self._db._rt.insert(ex, commit=True)
                 for alloc in ex.extents:
