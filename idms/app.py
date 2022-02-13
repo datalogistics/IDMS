@@ -49,7 +49,7 @@ def get_app(conf=None):
 
     while True:
         try:
-            rt = Runtime(unis, defer_update=True, preload=["nodes", "services"])
+            rt = Runtime(unis, cache={'preload':["nodes","services","exnodes","extents"]})
         except (ConnectionError, TimeoutError) as exp:
             msg = "Failed to start runtime, retrying... - {}".format(exp)
             logging.getLogger('idms').warn(msg)
@@ -57,7 +57,6 @@ def get_app(conf=None):
             continue
         break
 
-    master = UnisClient.resolve(unis[0])
     db = DBLayer(rt, depots, conf)
     for plugin in (conf['plugins'] or []):
         path = plugin.split('.')
@@ -66,7 +65,7 @@ def get_app(conf=None):
             db.add_post_process(getattr(module, path[-1])(db, conf))
         except (ImportError, AttributeError) as e:
             logging.getLogger('idms').warn(f"Bad postprocessing module [{plugin}] - {e}")
-    engine.run(db, conf['loopdelay'])
+    #engine.run(db, conf['loopdelay'])
     service = IDMSService(db, UnisClient.resolve(unis[0]))
     rt.addService(service)
     
