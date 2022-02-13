@@ -13,7 +13,7 @@ def run(db, delay):
                 [p.apply(db) for p in db.get_active_policies()]
                 if list(db.get_active_policies()):
                     stats = [p.status for p in db.get_active_policies()]
-                    _print_status([p.status for p in db.get_active_policies()])
+                    #_print_status([p.status for p in db.get_active_policies()])
                     log.debug(stats)
             except Exception as exp:
                 import traceback

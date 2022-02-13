@@ -15,7 +15,7 @@ class StaticHandler(_BaseHandler):
         else: resp.content_type = 'text/html'
         try:
             with open(filename, 'rb') as f:
-                resp.body = f.read()
+                resp.text = f.read()
         except OSError as e:
             print(e)
             resp.status = falcon.HTTP_404

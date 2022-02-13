@@ -48,9 +48,9 @@ class _BaseHandler(object):
             raise falcon.HTTPMissingHeader("Accept")
         
         if req.client_accepts(MIME['PSJSON']) or req.client_accepts(MIME['JSON']):
-            resp.body = json.dumps(resp.body)
+            resp.text = json.dumps(resp.text)
         #elif req.client_accepts(MIME['PSBSON']) or req.client_accepts(MIME['BSON']):
-        #    resp.body = bson.dumps(resp.body)
+        #    resp.text = bson.dumps(resp.text)
         
     def authorize(self, grants):
         return True

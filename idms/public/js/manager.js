@@ -476,5 +476,5 @@ $(window).ready(function() {
 	    url: 'a',
 	    success: populate_active
 	});
-    }, 1000);
+    }, 10000);
 });

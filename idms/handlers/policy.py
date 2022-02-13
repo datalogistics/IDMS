@@ -20,7 +20,7 @@ class PolicyHandler(_BaseHandler):
                             'default': v.default if v.default is not inspect._empty else '' }
             results[tag] = { 'args': args, 'description': policy.__doc__ or "" }
 
-        resp.body = results
+        resp.text = results
         resp.status = falcon.HTTP_200
     
     #@falcon.before(_BaseHandler.do_auth)
@@ -31,16 +31,16 @@ class PolicyHandler(_BaseHandler):
             assert "$match" in body, "No subject in request"
             assert "$action" in body, "No action in request"
         except AssertionError as exp:
-            resp.body = json.dumps({"errorcode": 1, "msg": str(exp)})
+            resp.text = json.dumps({"errorcode": 1, "msg": str(exp)})
             resp.status = falcon.HTTP_401
             return
         try:
             policy = Policy(body["$match"], body["$action"])
             policy_id = self._db.register_policy(policy)
         except Exception as exp:
-            resp.body = json.dumps({"errorcode": 2, "msg": "Malformed policy - {}".format(exp)})
+            resp.text = json.dumps({"errorcode": 2, "msg": "Malformed policy - {}".format(exp)})
             resp.status = falcon.HTTP_401
             return
          
-        resp.body = json.dumps({"errorcode": None, "msg": "", "policyid": policy_id})
+        resp.text = json.dumps({"errorcode": None, "msg": "", "policyid": policy_id})
         resp.status = falcon.HTTP_200

@@ -25,7 +25,7 @@ class FileHandler(_BaseHandler):
                  'name': e.name, 'content': self._folder(e, s)} for e in s(lambda x: x.parent == root and not hasattr(x, 'replica_of'))]
     @falcon.after(_BaseHandler.encode_response)
     def on_get(self, req, resp):
-        resp.body = self._folder(None, self._db._rt.exnodes.where)
+        resp.text = self._folder(None, self._db._rt.exnodes.where)
         resp.status = falcon.HTTP_200
     
     def _dispatch_block(self, block, offset, exnode, depots, dlen):
@@ -76,7 +76,7 @@ class FileHandler(_BaseHandler):
                 depots = self._db.get_depots(self._conf['upload']['staging'])
                 if not depots:
                     resp.status = falcon.HTTP_500
-                    resp.body = {"errorcode": 1, "msg": "No staging depot available"}
+                    resp.text = {"errorcode": 1, "msg": "No staging depot available"}
                     return
                 else: dlen, depots = len(depots), cycle(depots)
 
@@ -171,7 +171,7 @@ class FileHandler(_BaseHandler):
                 import traceback
                 traceback.print_exc()
                 resp.status = falcon.HTTP_400
-                resp.body = {"errorcode": 1, "msg": "Malformed multipart content"}
+                resp.text = {"errorcode": 1, "msg": "Malformed multipart content"}
                 return
             
 
@@ -179,14 +179,14 @@ class FileHandler(_BaseHandler):
             parent = payload['parent'][0]['content'].decode('utf-8') if 'parent' in payload else None
             parent = self._db._rt.exnodes.first_where(lambda x: x.id == parent)
             for ex in exnodes:
-                if not ExnodeInfo(ex).is_complete(): continue
+                if not ex.extents: continue
                 ex.parent = parent
                 self._db._rt.insert(ex, commit=True)
                 for alloc in ex.extents:
                     self._db._rt.insert(alloc, commit=True)
             ex.size = sum([e.size for e in ex.extents])
             self._db._rt.flush()
-            resp.body = self._folder(None, self._db._rt.exnodes.where)
+            resp.text = self._folder(None, self._db._rt.exnodes.where)
             resp.status = falcon.HTTP_200
             print((req.content_length / 1000000000 * 8) / (time.time() - s), "Gb/s")
 
@@ -209,7 +209,7 @@ class FileHandler(_BaseHandler):
         elif to_move:
             to_move.parent = None
         self._db._rt.flush()
-        resp.body = self._folder(None, self._db._rt.exnodes.where)
+        resp.text = self._folder(None, self._db._rt.exnodes.where)
         resp.status = falcon.HTTP_200
 
     @falcon.after(_BaseHandler.encode_response)
@@ -219,7 +219,7 @@ class FileHandler(_BaseHandler):
         remove = list(self._db._rt.exnodes.where(lambda x: x.mode == "file" and not valid(x)))
         [self._db._rt.delete(ex) for ex in remove]
 
-        resp.body = self._folder(None, self._db._rt.exnodes.where)
+        resp.text = self._folder(None, self._db._rt.exnodes.where)
         resp.status = falcon.HTTP_200
         
         
@@ -236,7 +236,7 @@ class DirHandler(FileHandler):
                                                      'group': 'idms',
                                                      'permission': '744'}), commit=True)
         self._db._rt.flush()
-        resp.body = self._folder(None, self._db._rt.exnodes.where)
+        resp.text = self._folder(None, self._db._rt.exnodes.where)
         resp.status = falcon.HTTP_200
 
 class IBPReader(object):

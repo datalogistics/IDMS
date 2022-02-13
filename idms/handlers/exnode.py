@@ -12,7 +12,7 @@ class HealthHandler(_BaseHandler):
     def on_get(self, req, resp, exnode):
         exnode = self._db._rt.exnodes.first_where({'id': exnode})
         if not exnode:
-            resp.body = "{}"
+            resp.text = "{}"
             resp.status = falcon.HTTP_404
             return
         results = {"filename": exnode.name, "rawsize": exnode.size, "depots": []}
@@ -34,5 +34,5 @@ class HealthHandler(_BaseHandler):
                         log.debug(f"Health check probe failed - {e}")
                         r['allocs']['dead'].append([a.offset, a.offset + a.size])
             results["depots"].append(r)
-        resp.body = json.dumps(results)
+        resp.text = json.dumps(results)
         resp.status = falcon.HTTP_200
