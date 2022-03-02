@@ -84,8 +84,7 @@ def watchdog():
     except: notify = lambda x,y=0,z=0,a=0: True
 
     notify("READY=1")
-    for _ in range(3):
-    #while True:
+    while True:
         notify("WATCHDOG=1")
         time.sleep(5)
 
