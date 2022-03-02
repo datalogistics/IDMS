@@ -1,9 +1,8 @@
-import argparse, importlib
+import argparse, importlib, threading
 import falcon, os, json, time, socket
 import logging as plogging
-from lace.logging import trace
 
-from idms import engine, settings
+from idms import settings
 from idms.config import MultiConfig
 from idms.handlers import PolicyHandler, PolicyTracker, SSLCheck, DepotHandler, BuiltinHandler, StaticHandler, FileHandler, DirHandler, DownloadHandler, HealthHandler
 from idms.lib.db import DBLayer
@@ -65,7 +64,6 @@ def get_app(conf=None):
             db.add_post_process(getattr(module, path[-1])(db, conf))
         except (ImportError, AttributeError) as e:
             logging.getLogger('idms').warn(f"Bad postprocessing module [{plugin}] - {e}")
-    #engine.run(db, conf['loopdelay'])
     service = IDMSService(db, UnisClient.resolve(unis[0]))
     rt.addService(service)
     
@@ -79,6 +77,18 @@ def get_app(conf=None):
 
 conf = settings.CONFIG
 
+def watchdog():
+    try:
+        from sdnotify import SystemdNotifier
+        notify = SystemdNotifier().notify
+    except: notify = lambda x,y=0,z=0,a=0: True
+
+    notify("READY=1")
+    for _ in range(3):
+    #while True:
+        notify("WATCHDOG=1")
+        time.sleep(5)
+
 def main():
     parser = argparse.ArgumentParser(description='')
     parser.add_argument('-u', '--unis', type=str,
@@ -90,6 +100,7 @@ def main():
     parser.add_argument('-S', '--upload.staging', type=str, metavar="STAGING", help="Set the accessPoint URL for the depot to stage new data")
     parser.add_argument('-q', '--viz_port', default='42424', type=str, help='Set the port fo the visualization effects')
     parser.add_argument('-V', '--version', action='store_true')
+    parser.add_argument('-N', '--sdnotify', action='store_true', help="Enable notifications and watchdog for systemd integration")
     conf = build_conf()
     conf = conf.from_parser(parser, include_logging=True)
 
@@ -109,6 +120,8 @@ def main():
     server = make_server(host, int(port), app)
     port = "" if port == 80 else port
     log.info("Listening on {}{}{}".format(host,":" if port else "", port))
+    if conf['sdnotify']:
+        t = threading.Thread(target=watchdog, daemon=True).start()
     server.serve_forever()
 
 if __name__ == "__main__":
