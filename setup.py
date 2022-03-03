@@ -44,7 +44,7 @@ setup(
         "git+https://github.com/datalogistics/libdlt.git/@develop#egg=libdlt"
     ],
     install_requires=[
-        "falcon>=2.0.0",
+        "falcon>=3.0.0",
         #"bson",
         "unisrt",
         "lace",

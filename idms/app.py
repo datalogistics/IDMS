@@ -68,7 +68,7 @@ def get_app(conf=None):
     rt.addService(service)
     
     ensure_ssl = SSLCheck(conf)
-    app = falcon.API(middleware=[FalconCORS()])
+    app = falcon.App(middleware=[FalconCORS()])
     for k,v in routes.items():
         handler = v.pop("handler")
         app.add_route("/{}".format(k), handler(conf, dblayer=db, **v))
@@ -111,8 +111,8 @@ def main():
     if conf['upload']['staging'] is None:
         conf['upload']['staging'] = f"ibp://{socket.gethostname()}:6714"
     log = logging.getLogger('idms')
-    app = get_app(conf)
     log.info("Fetching topology from {}".format(conf['unis']))
+    app = get_app(conf)
     
     from wsgiref.simple_server import make_server
     host, port = conf['host'] if conf['host'] else "0.0.0.0", conf['port']
