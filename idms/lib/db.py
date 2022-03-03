@@ -75,7 +75,7 @@ class DBLayer(object):
                         ex = chunk.parent
                         alloc = self._proxy.allocate(Depot(dst.accessPoint), 0, chunk.size, timeout=2)
                         alloc.offset = chunk.offset
-                        self._proxy.send(chunk, alloc)
+                        self._proxy.send(chunk, alloc, timeout=5)
                         self._viz_progress(socks[ex], alloc.location, alloc.size, alloc.offset)
                         try: del alloc.getObject().__dict__['function']
                         except KeyError: pass
