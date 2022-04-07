@@ -45,7 +45,6 @@ setup(
     ],
     install_requires=[
         "falcon>=3.0.0",
-        #"bson",
         "unisrt",
         "lace",
         "libdlt",

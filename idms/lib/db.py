@@ -58,7 +58,7 @@ class DBLayer(object):
     def move_allocs(self, allocs, dst=None, ttl=None, skip_pp=False):
         log.info("Moving [{}] {}->{}".format(allocs[0].parent.id, ",".join([str(a.offset) for a in allocs]), dst.name))
         def _job(allocs, dst, ttl):
-            socks = {}
+            socks, changes = {}, False
             try:
                 for a in allocs:
                     p = a.parent
@@ -86,13 +86,14 @@ class DBLayer(object):
                         ex.extents.append(alloc)
                         self._rt.insert(alloc, commit=True)
                         self._rt._update(ex)
-                        with self._flock:
-                            self._rt.flush()
+                        changes = True
                     except (IBPError, SatisfactionError): pass
-                with self._flock:
-                    self._rt.flush()
             finally:
                 [setattr(e, 'rt_live', True) for e in socks.keys()]
+                if changes:
+                    with self._flock:
+                        self._rt.flush()
+
                 with self._lock:
                     for a in allocs:
                         log.debug("Removing lock on - {}".format(a.parent.id))
